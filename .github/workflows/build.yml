@@ -24,17 +24,15 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v2
 
-    - name: Make gradlew executable
-      run: chmod +x ./android/gradlew
+    - name: Set up Gradle
+      uses: gradle/gradle-build-action@v2
 
     - name: Create local.properties
       run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
     - name: Build with Gradle
       working-directory: ./android
-      run: |
-        ./gradlew --version
-        ./gradlew assembleDebug
+      run: gradle assembleDebug
 
     - name: Upload APK
       if: success()
