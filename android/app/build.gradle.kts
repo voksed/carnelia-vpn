@@ -55,13 +55,27 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.core:core:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime:2.6.1")
+    
+    // DataStore for settings persistence
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // VPN & Networking
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    
+    // Outline VPN SDK (when available)
+    // implementation("org.outline:outline-android:1.0.0")
+    
+    // WireGuard Android
+    implementation("com.wireguard.android:tunnel:1.0.23")
+
+    // JSON serialization
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // Logging
     implementation("com.google.code.findbugs:jsr305:3.0.2")
+    implementation("androidx.work:work-runtime-ktx:2.8.1")
 
     // Testing
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.0")
+    testImplementation("junit:junit:4.13.2")
 }

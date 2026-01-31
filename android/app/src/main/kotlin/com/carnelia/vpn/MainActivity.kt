@@ -1,5 +1,6 @@
 package com.carnelia.vpn
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,22 +16,84 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.carnelia.vpn.ui.theme.CarheliaTheme
+import com.carnelia.vpn.core.*
+import com.carnelia.vpn.service.CarheliaVpnService
 
 class MainActivity : ComponentActivity() {
+    
+    private lateinit var vpnManager: VpnManager
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        vpnManager = VpnManager()
+        
         setContent {
             CarheliaTheme {
-                CarheliaApp()
+                CarheliaApp(vpnManager, ::startVpn, ::stopVpn)
             }
         }
+    }
+    
+    private fun startVpn() {
+        // Create test Outline config
+        val config = VpnServerConfig(
+            id = "outline-test",
+            name = "Test Outline Server",
+            protocol = VpnProtocol.OUTLINE,
+            host = "vpn.example.com",
+            port = 1234,
+            config = mapOf(
+                "method" to "chacha20-ietf-poly1305",
+                "password" to "testpassword"
+            ),
+            country = "US"
+        )
+        
+        // Start VPN service
+        val intent = Intent(this, CarheliaVpnService::class.java).apply {
+            action = CarheliaVpnService.ACTION_CONNECT
+            putExtra(CarheliaVpnService.EXTRA_CONFIG, config)
+        }
+        startService(intent)
+        
+        vpnManager.connect(config)
+    }
+    
+    private fun stopVpn() {
+        val intent = Intent(this, CarheliaVpnService::class.java).apply {
+            action = CarheliaVpnService.ACTION_DISCONNECT
+        }
+        startService(intent)
+        
+        vpnManager.disconnect()
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        vpnManager.destroy()
     }
 }
 
 @Composable
-fun CarheliaApp() {
-    var isConnected by remember { mutableStateOf(false) }
-    var selectedServer by remember { mutableStateOf("Автоматический выбор") }
+fun CarheliaApp(
+    vpnManager: VpnManager,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit
+) {
+    var connectionState by remember { mutableStateOf(ConnectionState.DISCONNECTED) }
+    var stats by remember { mutableStateOf(VpnStats()) }
+    var selectedServer by remember { mutableStateOf("Outline • Auto") }
+
+    // Listen to VPN state changes
+    LaunchedEffect(vpnManager) {
+        vpnManager.onStateChanged { state ->
+            connectionState = state
+        }
+        vpnManager.onStatsChanged { newStats ->
+            stats = newStats
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -73,13 +136,20 @@ fun CarheliaApp() {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = if (isConnected) "ПОДКЛЮЧЕНО" else "ОТКЛЮЧЕНО",
+                        text = when (connectionState) {
+                            ConnectionState.CONNECTED -> "ПОДКЛЮЧЕНО"
+                            ConnectionState.CONNECTING -> "ПОДКЛЮЧЕНИЕ..."
+                            ConnectionState.DISCONNECTING -> "ОТКЛЮЧЕНИЕ..."
+                            ConnectionState.ERROR -> "ОШИБКА"
+                            else -> "ОТКЛЮЧЕНО"
+                        },
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (isConnected) 
-                            MaterialTheme.colorScheme.primary 
-                        else 
-                            MaterialTheme.colorScheme.error
+                        color = when (connectionState) {
+                            ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primary
+                            ConnectionState.ERROR -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -92,19 +162,25 @@ fun CarheliaApp() {
 
             // Connect Button
             Button(
-                onClick = { isConnected = !isConnected },
+                onClick = { 
+                    if (connectionState == ConnectionState.CONNECTED) {
+                        onDisconnect()
+                    } else {
+                        onConnect()
+                    }
+                },
                 modifier = Modifier
-                    .size(120.dp)
-                    .fillMaxWidth(0.8f),
+                    .fillMaxWidth(0.8f)
+                    .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isConnected) 
+                    containerColor = if (connectionState == ConnectionState.CONNECTED) 
                         MaterialTheme.colorScheme.error 
                     else 
                         MaterialTheme.colorScheme.primary
                 )
             ) {
                 Text(
-                    text = if (isConnected) "ОТКЛЮЧИТЬ" else "ПОДКЛЮЧИТЬ",
+                    text = if (connectionState == ConnectionState.CONNECTED) "ОТКЛЮЧИТЬ" else "ПОДКЛЮЧИТЬ",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -121,7 +197,7 @@ fun CarheliaApp() {
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        "Сервер",
+                        "Протокол",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -129,10 +205,10 @@ fun CarheliaApp() {
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     OutlinedButton(
-                        onClick = { /* TODO: Server selection */ },
+                        onClick = { /* TODO: Protocol selection */ },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(selectedServer)
+                        Text("Outline (Shadowsocks)")
                     }
                 }
             }
@@ -142,8 +218,8 @@ fun CarheliaApp() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                StatItem("Отправлено", "0 B")
-                StatItem("Получено", "0 B")
+                StatItem("Отправлено", formatBytes(stats.bytesSent))
+                StatItem("Получено", formatBytes(stats.bytesReceived))
             }
         }
     }
@@ -165,5 +241,14 @@ fun StatItem(label: String, value: String) {
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+fun formatBytes(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+        bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+        else -> "${bytes / (1024 * 1024 * 1024)} GB"
     }
 }
