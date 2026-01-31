@@ -1,5 +1,7 @@
 package com.carnelia.vpn.core
 
+import java.io.Serializable
+
 /**
  * VPN Protocol Support
  */
@@ -38,8 +40,6 @@ enum class VpnErrorCode(val code: Int) {
     PROTOCOL_ERROR(5),
     UNKNOWN_ERROR(255)
 }
-
-import java.io.Serializable
 
 /**
  * VPN Server Configuration
