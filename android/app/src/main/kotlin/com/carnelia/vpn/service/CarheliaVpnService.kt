@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Binder
 import android.os.IBinder
+import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.*
 import com.carnelia.vpn.core.VpnManager
 import com.carnelia.vpn.core.VpnServerConfig

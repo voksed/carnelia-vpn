@@ -39,6 +39,8 @@ enum class VpnErrorCode(val code: Int) {
     UNKNOWN_ERROR(255)
 }
 
+import java.io.Serializable
+
 /**
  * VPN Server Configuration
  */
@@ -51,7 +53,7 @@ data class VpnServerConfig(
     val config: Map<String, String>, // Protocol-specific config
     val country: String? = null,
     val flag: String? = null
-)
+) : Serializable
 
 /**
  * VPN Statistics

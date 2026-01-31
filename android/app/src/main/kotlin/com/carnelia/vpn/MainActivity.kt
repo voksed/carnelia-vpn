@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.PowerSettingsNew
+// import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -166,7 +166,7 @@ fun CarheliaApp(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
-                                brush = Brush.diagonalGradient(
+                                brush = Brush.linearGradient(
                                     colors = listOf(
                                         Color(0xFF1A1A1A),
                                         Color(0xFF0D0D0D)
@@ -205,7 +205,7 @@ fun CarheliaApp(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    Icons.Default.PowerSettingsNew,
+                                    Icons.Default.Settings,
                                     contentDescription = null,
                                     tint = Color.Black,
                                     modifier = Modifier.size(32.dp)
@@ -351,7 +351,7 @@ fun CarheliaApp(
 }
 
 @Composable
-fun StatBox(label: String, value: String) {
+fun RowScope.StatBox(label: String, value: String) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
