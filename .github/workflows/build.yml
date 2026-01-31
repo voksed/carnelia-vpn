@@ -23,24 +23,24 @@ jobs:
         cache: gradle
 
     - name: Grant execute permission for gradlew
-      run: chmod +x ./gradlew
+      run: chmod +x ./android/gradlew
 
     - name: Create local.properties
       run: |
-        echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-        cat local.properties
+        echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug -x lint --stacktrace
+      working-directory: ./android
+      run: ./gradlew assembleDebug --stacktrace
 
     - name: Find APK files
       if: success()
-      run: find . -name "*.apk" -type f
+      run: find . -name "*.apk" -type f -exec ls -lh {} \;
 
     - name: Upload APK Artifact
       if: success()
       uses: actions/upload-artifact@v4
       with:
         name: carnelia-vpn-debug
-        path: app/build/outputs/apk/debug/*.apk
+        path: android/app/build/outputs/apk/debug/*.apk
         if-no-files-found: warn

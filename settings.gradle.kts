@@ -19,8 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CarheliaVPN"
-include(":app")
-
 rootProject.name = "Carnelia VPN"
 include(":app")
