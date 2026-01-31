@@ -21,29 +21,30 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Download Gradle Wrapper JAR
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v2
+
+    - name: Download gradle-wrapper.jar
       run: |
         cd android
         mkdir -p gradle/wrapper
-        curl -L https://services.gradle.org/distributions/gradle-8.6-bin.zip -o gradle-8.6.zip
-        unzip -q gradle-8.6.zip
-        cp gradle-8.6/lib/gradle-8.6.jar gradle/wrapper/gradle-wrapper.jar
-        rm -rf gradle-8.6 gradle-8.6.zip
+        wget -q https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar -O gradle/wrapper/gradle-wrapper.jar
 
-    - name: Grant execute permission for gradlew
+    - name: Make gradlew executable
       run: chmod +x ./android/gradlew
 
     - name: Create local.properties
       run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
-    - name: Build Debug APK
+    - name: Build with Gradle
       working-directory: ./android
-      run: ./gradlew assembleDebug --info
+      run: |
+        ./gradlew --version
+        ./gradlew assembleDebug
 
-    - name: Find and upload APK
+    - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
         name: carnelia-vpn-debug
         path: android/app/build/outputs/apk/debug/*.apk
-        if-no-files-found: warn
