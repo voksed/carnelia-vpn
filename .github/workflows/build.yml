@@ -20,24 +20,27 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+
+    - name: Download Gradle Wrapper JAR
+      run: |
+        cd android
+        mkdir -p gradle/wrapper
+        curl -L https://services.gradle.org/distributions/gradle-8.6-bin.zip -o gradle-8.6.zip
+        unzip -q gradle-8.6.zip
+        cp gradle-8.6/lib/gradle-8.6.jar gradle/wrapper/gradle-wrapper.jar
+        rm -rf gradle-8.6 gradle-8.6.zip
 
     - name: Grant execute permission for gradlew
       run: chmod +x ./android/gradlew
 
     - name: Create local.properties
-      run: |
-        echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+      run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
     - name: Build Debug APK
       working-directory: ./android
-      run: ./gradlew assembleDebug --stacktrace
+      run: ./gradlew assembleDebug --info
 
-    - name: Find APK files
-      if: success()
-      run: find . -name "*.apk" -type f -exec ls -lh {} \;
-
-    - name: Upload APK Artifact
+    - name: Find and upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
