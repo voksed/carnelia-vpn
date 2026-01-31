@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Carnelia VPN</string>
+    <string name="connect_button">ПОДКЛЮЧИТЬ</string>
+    <string name="disconnect_button">ОТКЛЮЧИТЬ</string>
+    <string name="connected_status">ПОДКЛЮЧЕНО</string>
+    <string name="disconnected_status">ОТКЛЮЧЕНО</string>
+    <string name="auto_select_server">Автоматический выбор</string>
+</resources>
