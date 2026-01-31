@@ -66,7 +66,7 @@ dependencies {
     // implementation("org.outline:outline-android:1.0.0")
     
     // WireGuard Android
-    implementation("com.wireguard.android:tunnel:1.0.20231115")
+    // implementation("com.wireguard.android:tunnel:1.0.20231115")
 
     // JSON serialization
     implementation("com.google.code.gson:gson:2.10.1")
