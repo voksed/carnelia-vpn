@@ -24,12 +24,6 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v2
 
-    - name: Download gradle-wrapper.jar
-      run: |
-        cd android
-        mkdir -p gradle/wrapper
-        wget -q https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar -O gradle/wrapper/gradle-wrapper.jar
-
     - name: Make gradlew executable
       run: chmod +x ./android/gradlew
 
