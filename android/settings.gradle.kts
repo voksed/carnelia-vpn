@@ -7,7 +7,7 @@ pluginManagement {
     plugins {
         id("com.android.application") version "8.2.0"
         id("com.android.library") version "8.2.0"
-        kotlin("android") version "1.9.20"
+        kotlin("android") version "1.9.21"
     }
 }
 
@@ -16,6 +16,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
