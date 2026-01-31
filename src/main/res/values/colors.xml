@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material Design 3 Colors -->
+    <color name="primary">#6750A4</color>
+    <color name="primary_dark">#5A4A8A</color>
+    <color name="accent">#03DAC6</color>
+    <color name="background">#FFFBFE</color>
+    <color name="surface">#FFFBFE</color>
+    <color name="error">#B3261E</color>
+    <color name="success">#1DB679</color>
+</resources>

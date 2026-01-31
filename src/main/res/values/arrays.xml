@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="protocol_entries">
+        <item>OpenVPN</item>
+        <item>WireGuard</item>
+        <item>IKEv2</item>
+    </string-array>
+
+    <string-array name="protocol_values">
+        <item>openvpn</item>
+        <item>wireguard</item>
+        <item>ikev2</item>
+    </string-array>
+
+    <string-array name="killswitch_entries">
+        <item>Disabled</item>
+        <item>Block All</item>
+        <item>Allow LAN</item>
+    </string-array>
+
+    <string-array name="killswitch_values">
+        <item>disabled</item>
+        <item>block_all</item>
+        <item>allow_lan</item>
+    </string-array>
+</resources>
