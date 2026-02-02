@@ -169,9 +169,12 @@ class CarheliaVpnService : VpnService() {
             
             // Ultra-Low Latency DNS configuration (Cloudflare + Quad9)
             // Using closest geo-distributed servers
-            builder.addDnsServer("1.1.1.1") // Cloudflare (Fastest global)
-            builder.addDnsServer("1.0.0.1") // Cloudflare Backup
-            builder.addDnsServer("9.9.9.9") // Quad9 (High performance fallback)
+            val currentDns = PrefsManager.getDnsServer(this)
+            if (currentDns.isNotEmpty()) {
+                builder.addDnsServer(currentDns) // User selected
+            }
+            // Fallbacks just in case user DNS fails or is empty/invalid
+            if (currentDns != "1.1.1.1") builder.addDnsServer("1.1.1.1")
             
             builder.setSession("Carnelia VPN")
             
@@ -180,6 +183,9 @@ class CarheliaVpnService : VpnService() {
             // we rely on the VPN interface remaining up or system settings.
             if (android.os.Build.VERSION.SDK_INT >= 29) {
                 builder.setMetered(false) 
+            }
+            if (android.os.Build.VERSION.SDK_INT >= 21 && PrefsManager.isKillSwitchEnabled(this)) {
+                 builder.setBlocking(true)
             }
             
             // Split Tunneling Logic

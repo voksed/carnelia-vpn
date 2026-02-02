@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +52,7 @@ fun AppSelectionScreen() {
     var apps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
     var selectedPackages by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         selectedPackages = PrefsManager.getSelectedApps(context)
@@ -104,13 +106,41 @@ fun AppSelectionScreen() {
                 CircularProgressIndicator(color = Color(0xFFFF1744))
             }
         } else {
-            LazyColumn(modifier = Modifier.padding(padding)) {
-                items(apps) { app ->
-                     AppItem(
-                         app = app,
-                         isSelected = selectedPackages.contains(app.packageName),
-                         onToggle = { toggleApp(app.packageName) }
-                     )
+            Column(modifier = Modifier.padding(padding)) {
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    placeholder = { Text("Поиск приложений...", color = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF2C2C2C),
+                        unfocusedContainerColor = Color(0xFF2C2C2C),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color(0xFFFF1744),
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                )
+
+                val filteredApps = apps.filter {
+                    it.name.contains(searchQuery, ignoreCase = true) ||
+                    it.packageName.contains(searchQuery, ignoreCase = true)
+                }
+
+                LazyColumn {
+                    items(filteredApps) { app ->
+                        AppItem(
+                            app = app,
+                            isSelected = selectedPackages.contains(app.packageName),
+                            onToggle = { toggleApp(app.packageName) }
+                        )
+                    }
                 }
             }
         }

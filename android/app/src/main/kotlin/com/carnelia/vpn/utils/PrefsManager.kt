@@ -12,12 +12,13 @@ object PrefsManager {
     private const val KEY_AUTO_CONNECT = "auto_connect_enabled"
     private const val KEY_TOR_ENABLED = "tor_enabled"
     private const val KEY_FRAGMENTATION_ENABLED = "frag_enabled"
+    private const val KEY_FRAGMENTATION_MODE = "frag_mode" // "light", "balanced", "aggressive"
     private const val KEY_FRAGMENT_PACKETS = "frag_packets"
     private const val KEY_FRAGMENT_LENGTH = "frag_length"
     private const val KEY_FRAGMENT_INTERVAL = "frag_interval"
     private const val KEY_KILL_SWITCH = "kill_switch_enabled"
     private const val KEY_DNS_SERVER = "dns_server_ip"
-    private const val KEY_THEME_COLOR = "theme_accent_color" // e.g. 0xFFE53935
+    private const val KEY_THEME_COLOR = "theme_accent_color"
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -62,6 +63,34 @@ object PrefsManager {
 
     fun setFragmentationEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_FRAGMENTATION_ENABLED, enabled).apply()
+    }
+    
+    fun getFragmentationMode(context: Context): String {
+        return getPrefs(context).getString(KEY_FRAGMENTATION_MODE, "balanced") ?: "balanced"
+    }
+    
+    fun setFragmentationMode(context: Context, mode: String) {
+        val editor = getPrefs(context).edit()
+        editor.putString(KEY_FRAGMENTATION_MODE, mode)
+        
+        when (mode) {
+            "light" -> {
+                editor.putString(KEY_FRAGMENT_PACKETS, "1-1")
+                editor.putString(KEY_FRAGMENT_LENGTH, "500-1000")
+                editor.putString(KEY_FRAGMENT_INTERVAL, "1-2")
+            }
+            "balanced" -> {
+                editor.putString(KEY_FRAGMENT_PACKETS, "1-2")
+                editor.putString(KEY_FRAGMENT_LENGTH, "100-200")
+                editor.putString(KEY_FRAGMENT_INTERVAL, "10-20")
+            }
+            "aggressive" -> {
+                editor.putString(KEY_FRAGMENT_PACKETS, "2-5")
+                editor.putString(KEY_FRAGMENT_LENGTH, "40-80")
+                editor.putString(KEY_FRAGMENT_INTERVAL, "30-50")
+            }
+        }
+        editor.apply()
     }
     
     fun getFragmentPackets(context: Context): String {

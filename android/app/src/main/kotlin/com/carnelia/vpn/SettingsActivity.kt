@@ -107,9 +107,7 @@ fun SettingsContent(
     
     // Advanced Settings State
     var fragEnabled by remember { mutableStateOf(PrefsManager.isFragmentationEnabled(context)) }
-    var fragPackets by remember { mutableStateOf(PrefsManager.getFragmentPackets(context)) }
-    var fragLength by remember { mutableStateOf(PrefsManager.getFragmentLength(context)) }
-    var fragInterval by remember { mutableStateOf(PrefsManager.getFragmentInterval(context)) }
+    var fragMode by remember { mutableStateOf(PrefsManager.getFragmentationMode(context)) }
 
     if (showLogs) {
         LogViewerDialog(onDismiss = { showLogs = false })
@@ -362,44 +360,29 @@ fun SettingsContent(
                             // Preset Buttons
                             Button(
                                 onClick = {
-                                    // Balanced (Current default)
-                                    fragPackets = "1-2"
-                                    fragLength = "500-1000"
-                                    fragInterval = "1-3"
-                                    PrefsManager.setFragmentPackets(context, "1-2")
-                                    PrefsManager.setFragmentLength(context, "500-1000")
-                                    PrefsManager.setFragmentInterval(context, "1-3")
+                                    fragMode = "balanced"
+                                    PrefsManager.setFragmentationMode(context, "balanced")
                                 },
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (fragLength == "500-1000") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                                colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == "balanced") MaterialTheme.colorScheme.primary else Color(0xFF333333))
                             ) { Text(stringResource(R.string.frag_mode_balanced), fontSize = 10.sp) }
 
                             Button(
                                 onClick = {
-                                    // Aggressive (For heavy censorship)
-                                    fragPackets = "2-3"
-                                    fragLength = "50-100"
-                                    fragInterval = "10-20"
-                                    PrefsManager.setFragmentPackets(context, "2-3")
-                                    PrefsManager.setFragmentLength(context, "50-100")
-                                    PrefsManager.setFragmentInterval(context, "10-20")
+                                    fragMode = "aggressive"
+                                    PrefsManager.setFragmentationMode(context, "aggressive")
                                 },
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (fragLength == "50-100") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                                colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == "aggressive") MaterialTheme.colorScheme.primary else Color(0xFF333333))
                             ) { Text(stringResource(R.string.frag_mode_aggressive), fontSize = 10.sp) }
                             
                              Button(
                                 onClick = {
-                                    // Light (Speed focused)
-                                    fragPackets = "1-1"
-                                    fragLength = "100-200" // tlshello
-                                    fragInterval = "1-2"
-                                    PrefsManager.setFragmentPackets(context, "1-1")
-                                    PrefsManager.setFragmentLength(context, "100-200")
-                                    PrefsManager.setFragmentInterval(context, "1-2")
+                                    fragMode = "light"
+                                    PrefsManager.setFragmentationMode(context, "light")
                                 },
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (fragLength == "100-200") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                                colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == "light") MaterialTheme.colorScheme.primary else Color(0xFF333333))
                             ) { Text(stringResource(R.string.frag_mode_light), fontSize = 10.sp) }
                         }
                     }
@@ -648,13 +631,15 @@ fun SettingsContent(
                     // Refresh state from defaults
                     dnsServer = "8.8.8.8"
                     splitTunneling = false
+                    splitTunnelMode = "allow"
                     bypassRu = false
                     autoConnect = false
                     killSwitch = false
                     fragEnabled = true
-                    fragPackets = "1-2"
-                    fragLength = "500-1000"
-                    fragInterval = "1-3"
+                    fragMode = "balanced"
+                    // Force set balanced values through setter as resetSettings clears keys
+                    PrefsManager.setFragmentationMode(context, "balanced")
+                    
                     onThemeChange(Color(0xFFFF1744)) // Reset theme color in UI state
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2B0000)),
