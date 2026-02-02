@@ -154,7 +154,7 @@ fun CarheliaApp(
     val stats by VpnGlobalState.stats.collectAsState()
     var serverList by remember { mutableStateOf(repository.getServers()) }
     var activeConfig by remember { 
-        mutableStateOf(repository.getLastUsedServer())
+        mutableStateOf(repository.getLastUsedServer() ?: repository.getServers().firstOrNull())
     }
     
     // Stats / Speed
@@ -168,13 +168,17 @@ fun CarheliaApp(
     val selectedServer = activeConfig?.name ?: stringResource(R.string.select_server_hint)
     var showAddDialog by remember { mutableStateOf(false) }
 
+    // Auto-Connect on App Launch
     LaunchedEffect(Unit) {
-        if (PrefsManager.isAutoConnectEnabled(context) && activeConfig != null) {
-            // Auto Connect logic - delay slightly to ensure UI is ready
-            // Ideally should check if already connected
-            // Using a small delay to avoid race conditions on fresh start
-            kotlinx.coroutines.delay(500) 
-            if (connectionState == ConnectionState.DISCONNECTED) {
+        if (PrefsManager.isAutoConnectEnabled(context)) {
+            // Ensure we have a config
+            if (activeConfig == null) {
+                activeConfig = repository.getServers().firstOrNull()
+            }
+            
+            if (activeConfig != null && connectionState == ConnectionState.DISCONNECTED) {
+                AppLogger.log("Auto-Connect: Initiating connection on app launch...")
+                kotlinx.coroutines.delay(300) 
                 onConnect(activeConfig!!)
             }
         }

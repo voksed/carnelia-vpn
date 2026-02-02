@@ -395,12 +395,28 @@ fun SettingsContent(
                             else -> stringResource(R.string.frag_desc_balanced)
                         }
                         
-                        Text(
-                            text = descText,
-                            color = Color.LightGray,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF2C2C2C)),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.filled.Info, 
+                                    contentDescription = "Info", 
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = descText,
+                                    color = Color(0xFFEEEEEE),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
                     }
                 }
             }
