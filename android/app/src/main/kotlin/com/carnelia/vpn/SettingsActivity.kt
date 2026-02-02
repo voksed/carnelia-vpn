@@ -303,6 +303,78 @@ fun SettingsContent(
             }
             
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Раздел Подключение (Split Tunneling) moved to top (merged logically near General)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.split_tunneling_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.split_tunneling_summary), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = splitTunneling,
+                            onCheckedChange = { 
+                                splitTunneling = it 
+                                PrefsManager.setSplitTunnelingEnabled(context, it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        )
+                    }
+                    
+                    if (splitTunneling) {
+                        HorizontalDivider(color = Color(0xFF2C2C2C))
+                        
+                        // Mode Selector
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                             Button(
+                                onClick = {
+                                    splitTunnelMode = "allow"
+                                    PrefsManager.setSplitTunnelMode(context, "allow")
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (splitTunnelMode == "allow") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                            ) { Text(stringResource(R.string.mode_allow), fontSize = 10.sp) }
+
+                            Button(
+                                onClick = {
+                                    splitTunnelMode = "disallow"
+                                    PrefsManager.setSplitTunnelMode(context, "disallow")
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (splitTunnelMode == "disallow") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                            ) { Text(stringResource(R.string.mode_disallow), fontSize = 10.sp) }
+                        }
+
+                        Button(
+                            onClick = { 
+                                context.startActivity(Intent(context, AppSelectionActivity::class.java))
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.select_apps), color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
             
             // Auto Connect
              Card(
@@ -551,85 +623,6 @@ fun SettingsContent(
 
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Раздел Подключение
-            Text(
-                stringResource(R.string.connection_section),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.split_tunneling_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
-                            Text(stringResource(R.string.split_tunneling_summary), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Switch(
-                            checked = splitTunneling,
-                            onCheckedChange = { 
-                                splitTunneling = it 
-                                PrefsManager.setSplitTunnelingEnabled(context, it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        )
-                    }
-                    
-                    if (splitTunneling) {
-                        HorizontalDivider(color = Color(0xFF2C2C2C))
-                        
-                        // Mode Selector
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                             Button(
-                                onClick = {
-                                    splitTunnelMode = "allow"
-                                    PrefsManager.setSplitTunnelMode(context, "allow")
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (splitTunnelMode == "allow") MaterialTheme.colorScheme.primary else Color(0xFF333333))
-                            ) { Text(stringResource(R.string.mode_allow), fontSize = 10.sp) }
-
-                            Button(
-                                onClick = {
-                                    splitTunnelMode = "disallow"
-                                    PrefsManager.setSplitTunnelMode(context, "disallow")
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (splitTunnelMode == "disallow") MaterialTheme.colorScheme.primary else Color(0xFF333333))
-                            ) { Text(stringResource(R.string.mode_disallow), fontSize = 10.sp) }
-                        }
-
-                        Button(
-                            onClick = { 
-                                context.startActivity(Intent(context, AppSelectionActivity::class.java))
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(stringResource(R.string.select_apps), color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
             Text(
                 stringResource(R.string.debug_section),
                 style = MaterialTheme.typography.labelSmall,
@@ -693,7 +686,7 @@ fun SettingsContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(
-                            imageVector = androidx.compose.material.icons.filled.KeyboardArrowRight,
+                            imageVector = Icons.Default.KeyboardArrowRight,
                             contentDescription = null,
                             tint = Color.Gray
                         )
