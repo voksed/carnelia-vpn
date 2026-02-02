@@ -39,9 +39,13 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.ui.res.stringResource
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Email // For Bug Report
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 
-class SettingsActivity : ComponentActivity() {
+class SettingsActivity : androidx.appcompat.app.AppCompatActivity() { // ComponentActivity -> AppCompatActivity
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,6 +73,11 @@ class SettingsActivity : ComponentActivity() {
             }
         }
     }
+}
+
+fun changeLanguage(context: Context, languageCode: String) {
+    val appLocale: LocaleListCompat = LocaleListCompat.forLanguageTags(languageCode)
+    AppCompatDelegate.setApplicationLocales(appLocale)
 }
 
 @Composable
@@ -109,8 +118,50 @@ fun SettingsContent(
     var fragEnabled by remember { mutableStateOf(PrefsManager.isFragmentationEnabled(context)) }
     var fragMode by remember { mutableStateOf(PrefsManager.getFragmentationMode(context)) }
 
+    var showLangDialog by remember { mutableStateOf(false) }
+
     if (showLogs) {
         LogViewerDialog(onDismiss = { showLogs = false })
+    }
+    
+    if (showLangDialog) {
+        AlertDialog(
+            onDismissRequest = { showLangDialog = false },
+            title = { Text(stringResource(R.string.language_title), color = Color.White) },
+            text = {
+                Column {
+                    Text(
+                        "English", 
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                changeLanguage(context, "en")
+                                showLangDialog = false
+                            }
+                            .padding(16.dp),
+                        color = Color.White
+                    )
+                    Text(
+                        "Русский", 
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                changeLanguage(context, "ru")
+                                showLangDialog = false
+                            }
+                            .padding(16.dp),
+                        color = Color.White
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLangDialog = false }) {
+                    Text(stringResource(R.string.cancel_action))
+                }
+            },
+            containerColor = Color(0xFF1E1E1E)
+        )
     }
 
     Scaffold(
@@ -404,7 +455,7 @@ fun SettingsContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = androidx.compose.material.icons.filled.Info, 
+                                    imageVector = Icons.Default.Info, 
                                     contentDescription = "Info", 
                                     tint = Color.Gray,
                                     modifier = Modifier.size(16.dp)
@@ -622,6 +673,36 @@ fun SettingsContent(
 
             Spacer(modifier = Modifier.height(8.dp))
             
+            // Language Button
+             Card(
+                onClick = { showLangDialog = true },
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween, // Center -> SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(stringResource(R.string.language_title), color = Color.White)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = androidx.core.os.LocaleListCompat.getAdjustedDefault().get(0)?.language?.uppercase() ?: "EN",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = androidx.compose.material.icons.filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Support / Telegram
              Card(
                 onClick = {
