@@ -93,6 +93,11 @@
     <string name="dns_ip_label">IP адрес</string>
     <string name="log_viewer_title">Журнал событий</string>
     <string name="copy_to_clipboard">Копировать в буфер</string>
-    <string name="mode_allow">Только выбранные</string>
-    <string name="mode_disallow">Исключить выбранные</string>
+    <string name="mode_allow">Только выбранные (Whitelist)</string>
+    <string name="mode_disallow">Исключить выбранные (Blacklist)</string>
+    
+    <!-- Fragmentation Descriptions -->
+    <string name="frag_desc_light">Лайт: Высокая скорость, базовый обход. Разбивает только начало (ClientHello).</string>
+    <string name="frag_desc_balanced">Баланс: Оптимально для большинства провайдеров (Рандом 1-2 пакета).</string>
+    <string name="frag_desc_aggressive">Агрессивный: Максимальная скрытность, ниже скорость. Сильная фрагментация.</string>
 </resources>

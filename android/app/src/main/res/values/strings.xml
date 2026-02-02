@@ -95,4 +95,9 @@
     <string name="copy_to_clipboard">Copy to clipboard</string>
     <string name="mode_allow">Proxy Only Selected</string>
     <string name="mode_disallow">Bypass Selected</string>
+    
+    <!-- Fragmentation Descriptions -->
+    <string name="frag_desc_light">Light: Fast speed, basic DPI bypass. Splits ClientHello (1-1).</string>
+    <string name="frag_desc_balanced">Balanced: Good speed/stealth balance. Random fragments (1-2).</string>
+    <string name="frag_desc_aggressive">Aggressive: High stealth, slower. Many small fragments (2-5).</string>
 </resources>

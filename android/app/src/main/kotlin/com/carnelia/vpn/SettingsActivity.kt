@@ -385,6 +385,22 @@ fun SettingsContent(
                                 colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == "light") MaterialTheme.colorScheme.primary else Color(0xFF333333))
                             ) { Text(stringResource(R.string.frag_mode_light), fontSize = 10.sp) }
                         }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Description Text for selected mode
+                        val descText = when (fragMode) {
+                            "light" -> stringResource(R.string.frag_desc_light)
+                            "aggressive" -> stringResource(R.string.frag_desc_aggressive)
+                            else -> stringResource(R.string.frag_desc_balanced)
+                        }
+                        
+                        Text(
+                            text = descText,
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
