@@ -3,6 +3,12 @@ package com.carnelia.vpn.core.protocols
 import com.carnelia.vpn.core.VpnErrorCode
 import com.carnelia.vpn.core.VpnServerConfig
 import com.carnelia.vpn.core.ConnectionState
+import com.carnelia.vpn.core.xray.XrayConfigBuilder
+import android.util.Log
+import kotlinx.coroutines.*
+import java.io.File
+// import libv2ray.Libv2ray
+import com.carnelia.vpn.utils.AppLogger
 
 /**
  * Base VPN Protocol Interface
@@ -22,79 +28,15 @@ interface IVpnProtocol {
     fun onConnectionStateChanged(listener: (ConnectionState) -> Unit)
     
     fun onBytesChanged(listener: (Long, Long) -> Unit)
+    
+    fun onNetworkInterfaceCreated(fileDescriptor: android.os.ParcelFileDescriptor)
 }
 
 /**
  * Outline VPN Protocol (Shadowsocks-based)
- * Lightweight, fast, works in restricted networks
+ * Now handled by XrayVpnProtocol (Shadowsocks support)
  */
-class OutlineVpnProtocol : IVpnProtocol {
-    
-    private var connectionState = ConnectionState.DISCONNECTED
-    private var bytesSent = 0L
-    private var bytesReceived = 0L
-    
-    private val stateListeners = mutableListOf<(ConnectionState) -> Unit>()
-    private val bytesListeners = mutableListOf<(Long, Long) -> Unit>()
-    
-    override suspend fun prepare(): VpnErrorCode {
-        return VpnErrorCode.NO_ERROR
-    }
-    
-    override suspend fun start(config: VpnServerConfig): VpnErrorCode {
-        try {
-            updateConnectionState(ConnectionState.CONNECTING)
-            
-            // Outline uses Shadowsocks protocol
-            // config.config should contain: "method", "password"
-            val method = config.config["method"] ?: "chacha20-ietf-poly1305"
-            val password = config.config["password"] ?: return VpnErrorCode.CONFIGURATION_ERROR
-            
-            // In production: connect to Outline server using liboutline
-            // For now: simulate connection
-            simulateConnection()
-            
-            updateConnectionState(ConnectionState.CONNECTED)
-            return VpnErrorCode.NO_ERROR
-            
-        } catch (e: Exception) {
-            updateConnectionState(ConnectionState.ERROR)
-            return VpnErrorCode.CONNECTION_FAILED
-        }
-    }
-    
-    override suspend fun stop() {
-        updateConnectionState(ConnectionState.DISCONNECTING)
-        // Cleanup
-        updateConnectionState(ConnectionState.DISCONNECTED)
-    }
-    
-    override fun getConnectionState(): ConnectionState = connectionState
-    
-    override fun getBytesTransferred(): Pair<Long, Long> = Pair(bytesSent, bytesReceived)
-    
-    override fun onConnectionStateChanged(listener: (ConnectionState) -> Unit) {
-        stateListeners.add(listener)
-    }
-    
-    override fun onBytesChanged(listener: (Long, Long) -> Unit) {
-        bytesListeners.add(listener)
-    }
-    
-    private fun updateConnectionState(newState: ConnectionState) {
-        if (connectionState != newState) {
-            connectionState = newState
-            stateListeners.forEach { it(newState) }
-        }
-    }
-    
-    private fun simulateConnection() {
-        // Simulate network activity
-        bytesSent += 1024
-        bytesReceived += 2048
-        bytesListeners.forEach { it(bytesSent, bytesReceived) }
-    }
-}
+// class OutlineVpnProtocol removed - mapped to XrayVpnProtocol
 
 /**
  * OpenVPN Protocol
@@ -117,14 +59,13 @@ class OpenVpnProtocol : IVpnProtocol {
         try {
             updateConnectionState(ConnectionState.CONNECTING)
             
+            AppLogger.error("OpenVpnProtocol", Exception("OpenVPN is not yet implemented in this version."))
+            
             // OpenVPN requires .ovpn config
-            val ovpnConfig = config.config["ovpn_data"] ?: return VpnErrorCode.CONFIGURATION_ERROR
+            // val ovpnConfig = config.config["ovpn_data"] ?: return VpnErrorCode.CONFIGURATION_ERROR
             
-            // In production: spawn openvpn process via Android VPN Service
-            // For now: simulate
-            
-            updateConnectionState(ConnectionState.CONNECTED)
-            return VpnErrorCode.NO_ERROR
+            updateConnectionState(ConnectionState.ERROR)
+            return VpnErrorCode.PROTOCOL_ERROR
             
         } catch (e: Exception) {
             updateConnectionState(ConnectionState.ERROR)
@@ -150,6 +91,12 @@ class OpenVpnProtocol : IVpnProtocol {
         bytesListeners.add(listener)
     }
     
+    override fun onNetworkInterfaceCreated(fileDescriptor: android.os.ParcelFileDescriptor) {
+        // Not used for OpenVPN/Impl
+    }
+    
+    // override fun startTun2Socks(fd: Int) {}
+    
     private fun updateConnectionState(newState: ConnectionState) {
         if (connectionState != newState) {
             connectionState = newState
@@ -160,64 +107,39 @@ class OpenVpnProtocol : IVpnProtocol {
 
 /**
  * WireGuard Protocol
- * Modern, fast, secure
+ * Now handled by XrayVpnProtocol (WireGuard outbound support)
  */
-class WireGuardProtocol : IVpnProtocol {
+// class WireGuardProtocol removed - mapped to XrayVpnProtocol
+
+
+/**
+ * Xray Protocol (Disabled for Outline compatibility)
+ */
+class XrayVpnProtocol : IVpnProtocol {
     
-    private var connectionState = ConnectionState.DISCONNECTED
-    private var bytesSent = 0L
-    private var bytesReceived = 0L
-    
-    private val stateListeners = mutableListOf<(ConnectionState) -> Unit>()
-    private val bytesListeners = mutableListOf<(Long, Long) -> Unit>()
+    private val connectionState = ConnectionState.DISCONNECTED
     
     override suspend fun prepare(): VpnErrorCode {
         return VpnErrorCode.NO_ERROR
     }
     
     override suspend fun start(config: VpnServerConfig): VpnErrorCode {
-        try {
-            updateConnectionState(ConnectionState.CONNECTING)
-            
-            // WireGuard config
-            val privateKey = config.config["private_key"] ?: return VpnErrorCode.CONFIGURATION_ERROR
-            val address = config.config["address"] ?: "10.0.0.2/32"
-            val dns = config.config["dns"] ?: "8.8.8.8"
-            
-            // In production: use WireGuard Android library
-            
-            updateConnectionState(ConnectionState.CONNECTED)
-            return VpnErrorCode.NO_ERROR
-            
-        } catch (e: Exception) {
-            updateConnectionState(ConnectionState.ERROR)
-            return VpnErrorCode.CONNECTION_FAILED
-        }
+        // Xray disabled to avoid class conflicts with Tun2Socks
+        AppLogger.error("XrayVpnProtocol", Exception("Xray protocol is disabled in this build."))
+        return VpnErrorCode.PROTOCOL_ERROR
     }
     
-    override suspend fun stop() {
-        updateConnectionState(ConnectionState.DISCONNECTING)
-        updateConnectionState(ConnectionState.DISCONNECTED)
-    }
+    override suspend fun stop() {}
     
     override fun getConnectionState(): ConnectionState = connectionState
     
-    override fun getBytesTransferred(): Pair<Long, Long> = Pair(bytesSent, bytesReceived)
+    override fun getBytesTransferred(): Pair<Long, Long> = Pair(0L, 0L)
     
-    override fun onConnectionStateChanged(listener: (ConnectionState) -> Unit) {
-        stateListeners.add(listener)
-    }
+    override fun onConnectionStateChanged(listener: (ConnectionState) -> Unit) {}
     
-    override fun onBytesChanged(listener: (Long, Long) -> Unit) {
-        bytesListeners.add(listener)
-    }
-    
-    private fun updateConnectionState(newState: ConnectionState) {
-        if (connectionState != newState) {
-            connectionState = newState
-            stateListeners.forEach { it(newState) }
-        }
-    }
+    override fun onBytesChanged(listener: (Long, Long) -> Unit) {}
+
+    override fun onNetworkInterfaceCreated(fileDescriptor: android.os.ParcelFileDescriptor) {}
 }
 
 /**
@@ -227,9 +149,16 @@ object ProtocolFactory {
     fun createProtocol(protocol: com.carnelia.vpn.core.VpnProtocol): IVpnProtocol {
         return when (protocol) {
             com.carnelia.vpn.core.VpnProtocol.OUTLINE -> OutlineVpnProtocol()
+            
+            com.carnelia.vpn.core.VpnProtocol.SHADOWSOCKS,
+            com.carnelia.vpn.core.VpnProtocol.WIREGUARD,
+            com.carnelia.vpn.core.VpnProtocol.VLESS,
+            com.carnelia.vpn.core.VpnProtocol.VMESS,
+            com.carnelia.vpn.core.VpnProtocol.TROJAN -> XrayVpnProtocol()
+            
             com.carnelia.vpn.core.VpnProtocol.OPENVPN -> OpenVpnProtocol()
-            com.carnelia.vpn.core.VpnProtocol.WIREGUARD -> WireGuardProtocol()
-            else -> OutlineVpnProtocol() // Default to Outline
+            
+            else -> XrayVpnProtocol() 
         }
     }
 }

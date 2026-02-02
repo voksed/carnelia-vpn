@@ -9,9 +9,13 @@ enum class VpnProtocol {
     OUTLINE,
     OPENVPN,
     WIREGUARD,
+    AMNEZIA_WG,
+    VLESS,
+    VMESS,
+    TROJAN,
+    SHADOWSOCKS,
     IKEV2,
-    CLOAK,
-    XRAY
+    CLOAK
 }
 
 /**

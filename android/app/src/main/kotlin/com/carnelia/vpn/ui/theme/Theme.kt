@@ -4,51 +4,57 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import com.carnelia.vpn.utils.PrefsManager
 
-// Ультра мрачная палитра: Черный, Красный, Белый
-private val DarkMrackColors = darkColorScheme(
-    // Основные цвета - Красный/Черный
-    primary = Color(0xFFE53935),           // Ярко-красный
-    onPrimary = Color(0xFF000000),         // Черный текст на красном
-    primaryContainer = Color(0xFF8B0000),  // Темно-красный контейнер
-    onPrimaryContainer = Color(0xFFFFFFFF), // Белый текст в контейнере
-    
-    // Вторичный - Немного мягче
-    secondary = Color(0xFFCC0000),         // Темно-красный
-    onSecondary = Color(0xFFFFFFFF),       // Белый текст
-    secondaryContainer = Color(0xFF330000), // Очень темно-красный
-    onSecondaryContainer = Color(0xFFFF6B6B), // Светло-красный текст
-    
-    // Третичный - Белый для контраста
-    tertiary = Color(0xFFFFFFFF),
-    onTertiary = Color(0xFF000000),
-    tertiaryContainer = Color(0xFFE0E0E0),
-    onTertiaryContainer = Color(0xFF000000),
-    
-    // Ошибки - Пульсирующий красный
-    error = Color(0xFFFF1744),
-    errorContainer = Color(0xFF5F0000),
-    onError = Color(0xFFFFFFFF),
-    onErrorContainer = Color(0xFFFFFFFF),
-    
-    // Фоны - Пропасть черноты
-    background = Color(0xFF0A0A0A),        // Почти черный
-    onBackground = Color(0xFFFFFFFF),      // Белый текст
-    surface = Color(0xFF1A1A1A),           // Немного светлее черного
-    onSurface = Color(0xFFFFFFFF),         // Белый текст
-    surfaceVariant = Color(0xFF2D2D2D),    // Серый-черный для разделения
-    onSurfaceVariant = Color(0xFFFF6B6B),  // Светло-красный текст
-)
+// Function to generate color scheme based on primary color
+fun createDarkScheme(primary: Color): androidx.compose.material3.ColorScheme {
+    return darkColorScheme(
+        primary = primary,
+        onPrimary = Color(0xFF000000),
+        primaryContainer = primary.copy(alpha = 0.5f), // Darker version
+        onPrimaryContainer = Color(0xFFFFFFFF),
+        
+        secondary = primary.copy(alpha = 0.8f),
+        onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = primary.copy(alpha = 0.3f), 
+        onSecondaryContainer = primary.copy(alpha = 1f), // Lighter text
+        
+        tertiary = Color(0xFFFFFFFF),
+        onTertiary = Color(0xFF000000),
+        tertiaryContainer = Color(0xFFE0E0E0),
+        onTertiaryContainer = Color(0xFF000000),
+        
+        error = Color(0xFFCF6679), // Standard Material Error Red
+        errorContainer = Color(0xFFB3261E),
+        onError = Color(0xFF000000),
+        onErrorContainer = Color(0xFFFFFFFF),
+        
+        background = Color(0xFF0A0A0A),
+        onBackground = Color(0xFFFFFFFF),
+        surface = Color(0xFF1A1A1A),
+        onSurface = Color(0xFFFFFFFF),
+        surfaceVariant = Color(0xFF2D2D2D),
+        onSurfaceVariant = Color(0xFFCAC4D0) // Standard text color, not primary
+    )
+}
 
 @Composable
 fun CarheliaTheme(
-    useDarkTheme: Boolean = true,
+    accentColor: Color? = null,
     content: @Composable () -> Unit
 ) {
-    val colors = DarkMrackColors
+    val context = LocalContext.current
+    // Default Red: 0xFFE53935
+    val storedColor = PrefsManager.getThemeColor(context)
+    
+    // Treat the Long as ARGB Int
+    val primaryColor = accentColor ?: Color(storedColor.toInt())
+
+    val colorScheme = createDarkScheme(primaryColor)
 
     MaterialTheme(
-        colorScheme = colors,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )

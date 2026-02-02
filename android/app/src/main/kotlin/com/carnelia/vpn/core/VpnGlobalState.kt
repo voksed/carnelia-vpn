@@ -1,0 +1,21 @@
+package com.carnelia.vpn.core
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+object VpnGlobalState {
+    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val _stats = MutableStateFlow(VpnStats())
+    val stats: StateFlow<VpnStats> = _stats.asStateFlow()
+
+    fun updateState(state: ConnectionState) {
+        _connectionState.value = state
+    }
+
+    fun updateStats(stats: VpnStats) {
+        _stats.value = stats
+    }
+}

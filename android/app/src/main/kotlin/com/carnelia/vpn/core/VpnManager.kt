@@ -4,11 +4,18 @@ import kotlinx.coroutines.*
 import com.carnelia.vpn.core.protocols.ProtocolFactory
 import com.carnelia.vpn.core.protocols.IVpnProtocol
 
+import com.carnelia.vpn.utils.PrefsManager
+import android.content.Context
+
 /**
  * Central VPN Manager
  * Coordinates all VPN operations
  */
-class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job())) {
+class VpnManager(
+    private val context: Context,
+    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job())
+) {
+
     
     private var currentProtocol: IVpnProtocol? = null
     private var currentConfig: VpnServerConfig? = null
@@ -18,7 +25,7 @@ class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dis
     
     private val stateListeners = mutableListOf<(ConnectionState) -> Unit>()
     private val statsListeners = mutableListOf<(VpnStats) -> Unit>()
-    private val errorListeners = mutableListOf<(VpnErrorCode) -> Unit>()
+    private val errorListeners = mutableListOf<(String) -> Unit>()
     
     /**
      * Connect to VPN server
@@ -28,14 +35,33 @@ class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dis
             try {
                 updateConnectionState(ConnectionState.PREPARING)
                 
+                // Inject Bypass RU setting
+                val mutableConfig = config.config.toMutableMap()
+                
+                // Feature Injection
+                if (PrefsManager.isBypassRuEnabled(context)) {
+                    mutableConfig["bypass_ru"] = "true"
+                }
+                if (PrefsManager.isFragmentationEnabled(context)) {
+                    mutableConfig["frag_enabled"] = "true"
+                    mutableConfig["frag_packets"] = PrefsManager.getFragmentPackets(context)
+                    mutableConfig["frag_length"] = PrefsManager.getFragmentLength(context)
+                    mutableConfig["frag_interval"] = PrefsManager.getFragmentInterval(context)
+                }
+                
+                // DNS Injection logic
+                mutableConfig["dns_server"] = PrefsManager.getDnsServer(context)
+                
+                val modifiedConfig = config.copy(config = mutableConfig)
+                
                 // Create protocol instance
                 currentProtocol = ProtocolFactory.createProtocol(config.protocol)
-                currentConfig = config
+                currentConfig = modifiedConfig
                 
                 // Prepare protocol
                 val prepareResult = currentProtocol?.prepare()
                 if (prepareResult != VpnErrorCode.NO_ERROR) {
-                    notifyError(prepareResult ?: VpnErrorCode.UNKNOWN_ERROR)
+                    notifyError("Prepare failed: ${prepareResult?.name}")
                     updateConnectionState(ConnectionState.ERROR)
                     return@launch
                 }
@@ -44,9 +70,9 @@ class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dis
                 setupProtocolListeners()
                 
                 // Start connection
-                val startResult = currentProtocol?.start(config)
+                val startResult = currentProtocol?.start(modifiedConfig)
                 if (startResult != VpnErrorCode.NO_ERROR) {
-                    notifyError(startResult ?: VpnErrorCode.UNKNOWN_ERROR)
+                    notifyError("Start failed: ${startResult?.name}")
                     updateConnectionState(ConnectionState.ERROR)
                     return@launch
                 }
@@ -56,12 +82,19 @@ class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dis
                 
             } catch (e: Exception) {
                 e.printStackTrace()
-                notifyError(VpnErrorCode.UNKNOWN_ERROR)
+                notifyError(e.message ?: "Unknown fatal error")
                 updateConnectionState(ConnectionState.ERROR)
             }
         }
     }
     
+    /**
+     * Called when TUN interface is ready
+     */
+    fun onInterfaceEstablished(pfd: android.os.ParcelFileDescriptor) {
+        currentProtocol?.onNetworkInterfaceCreated(pfd)
+    }
+
     /**
      * Disconnect from VPN
      */
@@ -105,7 +138,7 @@ class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dis
     /**
      * Register error listener
      */
-    fun onError(listener: (VpnErrorCode) -> Unit) {
+    fun onError(listener: (String) -> Unit) {
         errorListeners.add(listener)
     }
     
@@ -123,6 +156,7 @@ class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dis
                 bytesReceived = received
             )
             statsListeners.forEach { it(stats) }
+            VpnGlobalState.updateStats(stats)
         }
     }
     
@@ -137,14 +171,16 @@ class VpnManager(private val coroutineScope: CoroutineScope = CoroutineScope(Dis
             )
             stateListeners.forEach { it(newState) }
             statsListeners.forEach { it(stats) }
+            VpnGlobalState.updateState(newState) // Update Global State
         }
     }
     
     /**
      * Notify error
      */
-    private fun notifyError(error: VpnErrorCode) {
-        stats = stats.copy(lastError = error)
+    private fun notifyError(error: String) {
+        // stats = stats.copy(lastError = error) // Stats stores VpnErrorCode enum, so we can't put string there easily without changing Stats class. 
+        // For now just notify listeners.
         errorListeners.forEach { it(error) }
     }
     

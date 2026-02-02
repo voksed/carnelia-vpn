@@ -1,9 +1,98 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Carnelia VPN</string>
-    <string name="connect_button">ПОДКЛЮЧИТЬ</string>
-    <string name="disconnect_button">ОТКЛЮЧИТЬ</string>
-    <string name="connected_status">ПОДКЛЮЧЕНО</string>
-    <string name="disconnected_status">ОТКЛЮЧЕНО</string>
-    <string name="auto_select_server">Автоматический выбор</string>
+    <string name="connect_button">CONNECT</string>
+    <string name="disconnect_button">DISCONNECT</string>
+    <string name="connected_status">CONNECTED</string>
+    <string name="disconnected_status">DISCONNECTED</string>
+    <string name="auto_select_server">Auto Select</string>
+    
+    <!-- MainActivity -->
+    <string name="add_server_title">Add Server</string>
+    <string name="add_server_instruction">Paste access key (ss://, vless://, vmess://, trojan://)</string>
+    <string name="access_key_label">Access Key</string>
+    <string name="paste_button">Paste</string>
+    <string name="clipboard_empty">Clipboard is empty</string>
+    <string name="server_added">Server added: %1$s</string>
+    <string name="invalid_key_format">Invalid key format</string>
+    <string name="parsing_error">Parsing error: %1$s</string>
+    <string name="add_action">Add</string>
+    <string name="cancel_action">Cancel</string>
+    <string name="status_active">● ACTIVE</string>
+    <string name="status_inactive">● INACTIVE</string>
+    <string name="status_error">● ERROR</string>
+    <string name="select_server_hint">Select Server</string>
+    <string name="permission_granted_toast">Permission granted. Press Connect again.</string>
+    <string name="permission_denied_toast">VPN permission denied.</string>
+    <string name="vpn_start_error">VPN Start Error: %1$s</string>
+    <string name="error_prefix">Error: %1$s</string>
+
+    <!-- SettingsActivity -->
+    <string name="settings_title">Settings</string>
+    <string name="appearance_section">APPEARANCE</string>
+    <string name="accent_color">Accent Color</string>
+    <string name="general_section">GENERAL</string>
+    <string name="dns_server_label">DNS Server</string>
+    <string name="google_dns">Google</string>
+    <string name="cloudflare_dns">Cloudflare</string>
+    <string name="advanced_section">ADVANCED</string>
+    <string name="split_tunneling_title">Split Tunneling</string>
+    <string name="split_tunneling_summary">Only select apps use VPN</string>
+    <string name="exclude_apps_title">Exclude Apps</string>
+    <string name="bypass_ru_title">Bypass RU</string>
+    <string name="bypass_ru_summary">Direct connection for RU IPs</string>
+    <string name="kill_switch_title">Kill Switch</string>
+    <string name="kill_switch_summary">Block internet if VPN drops</string>
+    <string name="auto_connect_title">Auto Connect</string>
+    <string name="auto_connect_summary">Connect on app launch</string>
+    
+    <!-- DPI Bypass -->
+    <string name="dpi_bypass_section">DPI BYPASS</string>
+    <string name="fragmentation_title">Fragmentation</string>
+    <string name="fragmentation_summary">Split packets to bypass DPI</string>
+    <string name="frag_packets_label">Packets (e.g., 1-2)</string>
+    <string name="frag_length_label">Length (e.g., 500-1000)</string>
+    <string name="frag_interval_label">Interval (e.g., 1-3)</string>
+    
+    <!-- Support -->
+    <string name="support_section">SUPPORT</string>
+    <string name="view_logs">View Logs</string>
+    <string name="report_bug">Report Bug</string>
+    <string name="language_title">Language</string>
+    <string name="language_summary">Restart required to apply</string>
+    <string name="your_servers">YOUR SERVERS</string>
+    <string name="download_label">Download</string>
+    <string name="upload_label">Upload</string>
+    <string name="cancel_upper">CANCEL</string>
+    <string name="please_add_server">Please add a server first</string>
+    <string name="connecting_status">⟳ CONNECTING</string>
+    <string name="disconnecting_status">⟳ DISCONNECTING</string>
+    <string name="debug_section">DEBUG</string>
+    <string name="show_app_logs">Show App Logs</string>
+    <string name="reset_settings_caps">RESET TO DEFAULTS</string>
+    <string name="telegram_channel">Official Channel @mistervoksed</string>
+    <string name="version_fmt">Version: %1$s</string>
+    <string name="smart_routing_title">Smart Routing</string>
+    <string name="smart_routing_summary">Bypass VPN for RU sites</string>
+    <string name="bypass_advanced_section">CENSORSHIP BYPASS (ADVANCED)</string>
+    <string name="frag_mode_label">Fragmentation Mode</string>
+    <string name="frag_mode_balanced">Balanced</string>
+    <string name="frag_mode_aggressive">Aggressive</string>
+    <string name="frag_mode_light">Light</string>
+    <string name="security_section">SECURITY</string>
+    <string name="kill_switch_internal">Kill Switch (In-App)</string>
+    <string name="kill_switch_internal_desc">Block internet if VPN drops (Software).</string>
+    <string name="kill_switch_system">System Kill Switch</string>
+    <string name="kill_switch_system_desc">For 100% protection use Android settings: \'Block connections without VPN\'.</string>
+    <string name="open_android_settings">Open Android Settings</string>
+    <string name="enabled_status">Enabled</string>
+    <string name="disabled_status">Disabled</string>
+    <string name="select_apps">Select Apps</string>
+    <string name="connection_section">CONNECTION</string>
+    <string name="custom_dns_label">Custom</string>
+    <string name="dns_ip_label">IP Address</string>
+    <string name="log_viewer_title">Event Log</string>
+    <string name="copy_to_clipboard">Copy to clipboard</string>
+    <string name="mode_allow">Proxy Only Selected</string>
+    <string name="mode_disallow">Bypass Selected</string>
 </resources>
