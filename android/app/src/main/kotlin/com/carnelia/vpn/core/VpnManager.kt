@@ -55,7 +55,7 @@ class VpnManager(
                 val modifiedConfig = config.copy(config = mutableConfig)
                 
                 // Create protocol instance
-                currentProtocol = ProtocolFactory.createProtocol(config.protocol)
+                currentProtocol = ProtocolFactory.createProtocol(context, config.protocol)
                 currentConfig = modifiedConfig
                 
                 // Prepare protocol

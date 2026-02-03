@@ -19,37 +19,64 @@ class ServerRepository(context: Context) {
 
     fun getServers(): List<VpnServerConfig> {
         val json = prefs.getString(SERVERS_KEY, "[]")
+        com.carnelia.vpn.utils.AppLogger.log("Repository: Loaded raw JSON: $json")
         return try {
-            val type = object : TypeToken<List<VpnServerConfig>>() {}.type
-            val list: List<VpnServerConfig>? = gson.fromJson(json, type)
-            // Filter out corrupted data (Gson can create objects with null fields even if Kotlin says non-null)
-            list?.filter { 
-                it != null && 
-                it.id != null && 
-                it.name != null && 
-                it.host != null && 
-                it.protocol != null 
+            // Use Array to avoid R8/ProGuard TypeToken issues with generics
+            val array = gson.fromJson(json, Array<VpnServerConfig>::class.java)
+            val list = array?.toList() ?: emptyList()
+            
+            if (array == null) {
+                com.carnelia.vpn.utils.AppLogger.log("Repository: Deserialized list is NULL")
+            } else {
+                com.carnelia.vpn.utils.AppLogger.log("Repository: Deserialized list size: ${list.size}")
+                list.forEachIndexed { index, config ->
+                    com.carnelia.vpn.utils.AppLogger.log("Repository: Item $index: id=${config.id}, protocol=${config.protocol}, host=${config.host}")
+                }
+            }
+
+            // Filter is relaxed to check for essential connection data only.
+            // If Protocol is null, we might default it or skip.
+            // But we must assume if Gson fails to load protocol, it is broken data.
+            // However, debugging shows R8 sometimes causes issues here.
+            val result = list?.filter { 
+               it != null && !it.id.isNullOrBlank()
             } ?: emptyList()
+            if (result.isEmpty() && list != null && list.isNotEmpty()) {
+                 com.carnelia.vpn.utils.AppLogger.log("Repository: WARNING - ALL items were filtered out! Check R8 obfuscation or data integrity.")
+            }
+            result
         } catch (e: Exception) {
-            // If data is corrupted, clear it to prevent persistent crashes
-            prefs.edit().remove(SERVERS_KEY).apply()
+            // Log error but don't clear data immediately to allow recovery if it's just a read error
+             com.carnelia.vpn.utils.AppLogger.error("Repository: Error loading servers", e)
             emptyList()
         }
     }
 
     fun addServer(config: VpnServerConfig) {
         val current = getServers().toMutableList()
-        // Avoid duplicates by ID or Host+Port combination
-        val exists = current.any { 
-            it.id == config.id || (it.host == config.host && it.port == config.port)
-        }
+        // Allow multiple configs for same host (e.g. different keys/users)
+        // Only check for exact ID duplication (which implies same object instance or explicit update)
+        val exists = current.any { it.id == config.id }
         
         if (!exists) {
             current.add(0, config) // Add to top
             saveServers(current)
             com.carnelia.vpn.utils.AppLogger.log("Repository: Saved ${current.size} servers")
         } else {
-            com.carnelia.vpn.utils.AppLogger.log("Repository: Server already exists or duplicate")
+            // If ID exists, maybe update it? For now, just log.
+            com.carnelia.vpn.utils.AppLogger.log("Repository: Server with ID ${config.id} already exists")
+        }
+    }
+
+    fun updateServer(config: VpnServerConfig) {
+        val current = getServers().toMutableList()
+        val index = current.indexOfFirst { it.id == config.id }
+        if (index != -1) {
+            current[index] = config
+            saveServers(current)
+            com.carnelia.vpn.utils.AppLogger.log("Repository: Updated server ${config.id}")
+        } else {
+            com.carnelia.vpn.utils.AppLogger.log("Repository: Failed to update, server ${config.id} not found")
         }
     }
 

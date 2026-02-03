@@ -210,9 +210,7 @@ class CarheliaVpnService : VpnService() {
                     AppLogger.log("Service: Split Tunneling active but list empty ($mode) (Proxying all).")
                 }
                 
-                // If mode is "disallow", we are effectively proxying "all except selected".
-                // We should also exclude ourselves if we aren't in the list?
-                // Actually, just standard practice to exclude self to avoid loop if possible.
+                // Exclude self to avoid Xray Loop (since Xray runs under app's UID)
                 if (mode == "disallow" && !selectedApps.contains(packageName)) {
                      try {
                         builder.addDisallowedApplication(packageName)
@@ -222,6 +220,7 @@ class CarheliaVpnService : VpnService() {
             } else {
                 AppLogger.log("Service: Split Tunneling disabled (Global Proxy)")
                 try {
+                    // Critical: Exclude self to allow Xray process to reach internet directly
                     builder.addDisallowedApplication(packageName)
                 } catch (e: Exception) {
                     AppLogger.error("Service: Failed to exclude self from VPN", e)

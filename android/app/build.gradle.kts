@@ -11,8 +11,8 @@ android {
         applicationId = "com.carnelia.vpn"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "0.1.11"
+        versionCode = 16
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -55,8 +55,19 @@ android {
         kotlinCompilerExtensionVersion = "1.5.6"
     }
 
-    packagingOptions {
-        resources.excludes.add("META-INF/native-image/**")
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+        resources {
+            excludes.add("META-INF/native-image/**")
+            pickFirst("go/**") // Resolve Go class conflict
+            pickFirst("go/Seq.class")
+            pickFirst("go/Seq$*.class")
+            pickFirst("go/Universe.class")
+            pickFirst("go/Universe$*.class")
+            pickFirst("go/error.class")
+        }
     }
 }
 
@@ -105,6 +116,10 @@ dependencies {
     // LibXray (Local AAR) - Disabled to avoid conflict with Outline
     // implementation(files("libs/libv2ray.aar"))
     
+    // OpenVPN (ics-openvpn)
+    // implementation("com.github.schwabe:ics-openvpn:v0.6.73-production")
+    implementation(project(":vpnLib"))
+
     // Outline Tun2Socks (Must be provided in libs/)
     implementation(files("libs/tun2socks.aar"))
     // implementation("org.getoutline.client:tun2socks:0.0.1")

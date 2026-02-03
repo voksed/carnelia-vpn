@@ -88,6 +88,17 @@ object XrayConfigBuilder {
             addProperty("userLevel", 0) // Bind to Level 0 policy
             // No auth, no accounts for system stats
         })
+
+        // Local Shadowsocks inbound (For Tun2Socks)
+        val ssInbound = JsonObject()
+        ssInbound.addProperty("tag", "ss_local")
+        ssInbound.addProperty("port", 10810)
+        ssInbound.addProperty("protocol", "shadowsocks")
+        ssInbound.add("settings", JsonObject().apply {
+            addProperty("method", "chacha20-ietf-poly1305")
+            addProperty("password", "local-xray-tun")
+            addProperty("network", "tcp,udp")
+        })
         
         // Sniffing
         val sniffing = JsonObject()
@@ -101,6 +112,7 @@ object XrayConfigBuilder {
         
         inbounds.add(socksInbound)
         inbounds.add(httpInbound) // Add HTTP inbound
+        inbounds.add(ssInbound)
         root.add("inbounds", inbounds)
 
         // Outbounds

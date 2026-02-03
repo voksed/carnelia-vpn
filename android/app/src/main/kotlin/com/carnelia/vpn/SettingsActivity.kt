@@ -36,7 +36,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Send
 
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+// import com.carnelia.vpn.BuildConfig
+
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.material.icons.filled.Info
@@ -304,7 +308,67 @@ fun SettingsContent(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Раздел Подключение (Split Tunneling) moved to top (merged logically near General)
+            // Auto Connect
+             Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.auto_connect_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.auto_connect_summary), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(
+                        checked = autoConnect,
+                        onCheckedChange = { 
+                            autoConnect = it 
+                            PrefsManager.setAutoConnectEnabled(context, it)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Smart Routing
+             Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.smart_routing_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.smart_routing_summary), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(
+                        checked = bypassRu,
+                        onCheckedChange = { 
+                            bypassRu = it 
+                            PrefsManager.setBypassRuEnabled(context, it)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Раздел Подключение (Split Tunneling)
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
                 modifier = Modifier.fillMaxWidth()
@@ -371,66 +435,6 @@ fun SettingsContent(
                             Text(stringResource(R.string.select_apps), color = MaterialTheme.colorScheme.primary)
                         }
                     }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Auto Connect
-             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.auto_connect_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.auto_connect_summary), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(
-                        checked = autoConnect,
-                        onCheckedChange = { 
-                            autoConnect = it 
-                            PrefsManager.setAutoConnectEnabled(context, it)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Smart Routing
-             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.smart_routing_title), color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.smart_routing_summary), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(
-                        checked = bypassRu,
-                        onCheckedChange = { 
-                            bypassRu = it 
-                            PrefsManager.setBypassRuEnabled(context, it)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
                 }
             }
 
@@ -756,9 +760,16 @@ fun SettingsContent(
             }
             
             Spacer(modifier = Modifier.weight(1f))
-            
+
+            val versionInfo = try {
+                 val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                 "${packageInfo.versionName} (Build ${packageInfo.longVersionCode})"
+            } catch (e: Exception) {
+                 "Unknown Version"
+            }
+
             Text(
-                stringResource(R.string.version_fmt, "0.1.2-beta (Build 3)"),
+                stringResource(R.string.version_fmt, versionInfo),
                 color = Color.Gray,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 style = MaterialTheme.typography.bodySmall

@@ -21,6 +21,7 @@
 
     <application
         android:allowBackup="false"
+        tools:replace="android:allowBackup"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -37,6 +38,44 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            
+            <!-- OpenVPN File Support -->
+            <!-- 1. Specific MIME types (High priority, no extension needed) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/x-openvpn-profile" />
+                <data android:mimeType="application/ovpn" />
+            </intent-filter>
+            
+            <!-- 2. Path Pattern for Content URIs (Telegram, Downloads) with generic MIME -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.ovpn" />
+                <data android:pathPattern=".*\\.conf" />
+                <data android:pathPattern=".*\\.OVPN" />
+                <data android:pathPattern=".*\\.CONF" />
+            </intent-filter>
+
+            <!-- 3. Path Pattern for File URIs (Managers) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.ovpn" />
+                <data android:pathPattern=".*\\.conf" />
+                <data android:pathPattern=".*\\.OVPN" />
+                <data android:pathPattern=".*\\.CONF" />
+            </intent-filter>
         </activity>
 
         <service
@@ -49,6 +88,20 @@
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+
+        <!-- OpenVPN Service (Required for Android 14+ specific foreground type) -->
+        <!--
+        <service
+            android:name="de.blinkt.openvpn.core.OpenVPNService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="true"
+            android:foregroundServiceType="specialUse">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="vpn_connection" />
+        </service>
+        -->
         
         <service
             android:name=".service.VpnTileService"

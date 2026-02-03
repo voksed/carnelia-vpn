@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +40,10 @@ import com.carnelia.vpn.ui.theme.CarheliaTheme
 import com.carnelia.vpn.core.*
 import com.carnelia.vpn.utils.ConfigParser
 import com.carnelia.vpn.service.CarheliaVpnService
+import com.carnelia.vpn.core.VpnProtocol
+import com.carnelia.vpn.utils.OpenVpnHelper
+import de.blinkt.openvpn.core.VpnStatus
+import com.carnelia.vpn.core.ConnectionState
 import com.carnelia.vpn.data.ServerRepository
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -69,10 +74,46 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW) {
+            try {
+                val uri = intent.data
+                if (uri != null) {
+                    val content = contentResolver.openInputStream(uri)?.use { inputStream ->
+                        java.io.BufferedReader(java.io.InputStreamReader(inputStream)).readText()
+                    }
+                    if (!content.isNullOrBlank()) {
+                        val config = ConfigParser.parse(content)
+                        if (config != null) {
+                            val repo = ServerRepository(this)
+                            repo.addServer(config)
+                            repo.setLastUsedServer(config)
+                            Toast.makeText(this, getString(R.string.server_added, config.name), Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(this, getString(R.string.invalid_key_format), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.error("Failed to import file", e)
+                Toast.makeText(this, "Import Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         AppLogger.log("App Started. Board: ${android.os.Build.BOARD}, Android: ${android.os.Build.VERSION.SDK_INT}")
+
+        // Handle File Open Intent
+        handleIntent(intent)
+
         
         vpnManager = VpnManager(this) // Pass context for prefs
         
@@ -112,6 +153,13 @@ class MainActivity : ComponentActivity() {
                 return
             }
 
+            // Special Handling for OpenVPN (External Service)
+            if (config.protocol == VpnProtocol.OPENVPN) {
+                AppLogger.log("Starting OpenVPN Service...")
+                OpenVpnHelper.startVpn(this, config)
+                return
+            }
+
             val serviceIntent = Intent(this, CarheliaVpnService::class.java).apply {
                 action = CarheliaVpnService.ACTION_CONNECT
                 putExtra(CarheliaVpnService.EXTRA_CONFIG, config)
@@ -125,6 +173,7 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun stopVpn() {
+        // Stop Internal Service
         val intent = Intent(this, CarheliaVpnService::class.java).apply {
             action = CarheliaVpnService.ACTION_DISCONNECT
         }
@@ -167,6 +216,8 @@ fun CarheliaApp(
     
     val selectedServer = activeConfig?.name ?: stringResource(R.string.select_server_hint)
     var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingServer by remember { mutableStateOf<VpnServerConfig?>(null) }
 
     // Auto-Connect on App Launch
     LaunchedEffect(Unit) {
@@ -214,18 +265,35 @@ fun CarheliaApp(
 
     if (showAddDialog) {
         var keyText by remember { mutableStateOf("") }
+        var serverName by remember { mutableStateOf("") }
+        
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
             title = { Text(stringResource(R.string.add_server_title)) },
             text = {
                 Column {
                     Text(stringResource(R.string.add_server_instruction))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Server Name Input
+                    OutlinedTextField(
+                        value = serverName,
+                        onValueChange = { serverName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Server Name (Optional)") },
+                        singleLine = true
+                    )
+                    
                     Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Key Input
                     OutlinedTextField(
                         value = keyText,
                         onValueChange = { keyText = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.access_key_label)) },
+                        minLines = 3,
+                        maxLines = 6,
                         trailingIcon = {
                             IconButton(
                                 onClick = {
@@ -237,7 +305,7 @@ fun CarheliaApp(
                                     }
                                 }
                             ) {
-                                Icon(Icons.Default.ContentPaste, stringResource(R.string.paste_button)) // Fallback icon if Paste missing or just Add
+                                Icon(Icons.Default.ContentPaste, stringResource(R.string.paste_button))
                             }
                         }
                     )
@@ -247,8 +315,13 @@ fun CarheliaApp(
                 TextButton(
                     onClick = {
                         try {
-                            val config = ConfigParser.parse(keyText)
+                            var config = ConfigParser.parse(keyText)
                             if (config != null) {
+                                // Apply custom name if provided
+                                if (serverName.isNotBlank()) {
+                                    config = config.copy(name = serverName)
+                                }
+                                
                                 repository.addServer(config)
                                 serverList = repository.getServers()
                                 activeConfig = config
@@ -270,6 +343,107 @@ fun CarheliaApp(
             },
             dismissButton = {
                 TextButton(onClick = { showAddDialog = false }) {
+                    Text(stringResource(R.string.cancel_action))
+                }
+            }
+        )
+    }
+
+    if (showEditDialog && editingServer != null) {
+        var keyText by remember { mutableStateOf("") }
+        var serverName by remember { mutableStateOf(editingServer!!.name) }
+        
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false; editingServer = null },
+            title = { Text("Edit Server") },
+            text = {
+                Column {
+                    Text("Update server details below.")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Server Name Input
+                    OutlinedTextField(
+                        value = serverName,
+                        onValueChange = { serverName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Server Name") },
+                        singleLine = true
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Key Input
+                    OutlinedTextField(
+                        value = keyText,
+                        onValueChange = { keyText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("New Key (Leave empty to keep current)") },
+                        placeholder = { Text("ss://... or vless://...") },
+                        minLines = 3,
+                        maxLines = 6,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = {
+                                    val clipText = clipboardManager.getText()?.text
+                                    if (!clipText.isNullOrBlank()) {
+                                        keyText = clipText
+                                    } else {
+                                        Toast.makeText(context, context.getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.ContentPaste, stringResource(R.string.paste_button))
+                            }
+                        }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        try {
+                            var newConfig: VpnServerConfig = editingServer!!
+                            
+                            // If key provided, parse it
+                            if (keyText.isNotBlank()) {
+                                val parsed = ConfigParser.parse(keyText)
+                                if (parsed != null) {
+                                    newConfig = parsed
+                                } else {
+                                    Toast.makeText(context, context.getString(R.string.invalid_key_format), Toast.LENGTH_SHORT).show()
+                                    return@TextButton
+                                }
+                            }
+                            
+                            // Apply name and preserve ID
+                            newConfig = newConfig.copy(
+                                id = editingServer!!.id,
+                                name = if (serverName.isNotBlank()) serverName else newConfig.name
+                            )
+                            
+                            repository.updateServer(newConfig)
+                            serverList = repository.getServers()
+                            
+                            // Update active config if it was the one modified
+                            if (activeConfig?.id == newConfig.id) {
+                                activeConfig = newConfig
+                                repository.setLastUsedServer(newConfig)
+                            }
+                            
+                            Toast.makeText(context, "Server updated", Toast.LENGTH_SHORT).show()
+                            showEditDialog = false
+                            editingServer = null
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            Toast.makeText(context, context.getString(R.string.parsing_error, e.message), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false; editingServer = null }) {
                     Text(stringResource(R.string.cancel_action))
                 }
             }
@@ -521,6 +695,10 @@ fun CarheliaApp(
                                 activeConfig = server
                                 repository.setLastUsedServer(server)
                             },
+                            onEdit = {
+                                editingServer = server
+                                showEditDialog = true
+                            },
                             onDelete = {
                                 repository.removeServer(server.id)
                                 serverList = repository.getServers()
@@ -603,6 +781,7 @@ fun ServerItem(
     server: VpnServerConfig,
     isActive: Boolean,
     onSelect: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     var pingMs by remember { mutableStateOf<Long?>(null) }
@@ -680,6 +859,15 @@ fun ServerItem(
                     )
                 }
                 
+                IconButton(onClick = onEdit) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        tint = Color(0xFF888888),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Delete,

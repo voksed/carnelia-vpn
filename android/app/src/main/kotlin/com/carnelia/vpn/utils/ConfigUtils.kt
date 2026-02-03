@@ -25,8 +25,37 @@ object ConfigParser {
             trimmed.startsWith("vless://") -> parseVless(trimmed)
             trimmed.startsWith("vmess://") -> parseVmess(trimmed)
             trimmed.startsWith("trojan://") -> parseTrojan(trimmed)
+            // Simple heuristic for OpenVPN text content
+            trimmed.contains("client") && trimmed.contains("remote ") -> parseOpenVpnContent(trimmed)
+            trimmed.contains("dev tun") -> parseOpenVpnContent(trimmed)
+            trimmed.startsWith("client\r\n") || trimmed.startsWith("client\n") -> parseOpenVpnContent(trimmed)
             else -> null
         }
+    }
+    
+    fun parseOpenVpnContent(content: String): VpnServerConfig {
+        // Simple extraction of host for name
+        var name = "OpenVPN Server"
+        try {
+            val remoteLine = content.lines().find { it.trim().startsWith("remote ") }
+            if (remoteLine != null) {
+                val parts = remoteLine.trim().split("\\s+".toRegex())
+                if (parts.size >= 2) {
+                    name = parts[1]
+                }
+            }
+        } catch (e: Exception) {}
+
+        return VpnServerConfig(
+            id = UUID.randomUUID().toString(),
+            name = name,
+            protocol = VpnProtocol.OPENVPN,
+            host = name, // Used for display
+            port = 1194, // Default, not strict
+            config = mapOf(
+                "ovpn_data" to content
+            )
+        )
     }
 
     private fun parseShadowsocks(url: String): VpnServerConfig? {
