@@ -56,15 +56,48 @@ class ServerRepository(context: Context) {
         val current = getServers().toMutableList()
         // Allow multiple configs for same host (e.g. different keys/users)
         // Only check for exact ID duplication (which implies same object instance or explicit update)
-        val exists = current.any { it.id == config.id }
+        val index = current.indexOfFirst { it.id == config.id }
         
-        if (!exists) {
+        if (index == -1) {
             current.add(0, config) // Add to top
-            saveServers(current)
-            com.carnelia.vpn.utils.AppLogger.log("Repository: Saved ${current.size} servers")
         } else {
-            // If ID exists, maybe update it? For now, just log.
-            com.carnelia.vpn.utils.AppLogger.log("Repository: Server with ID ${config.id} already exists")
+             // Replace if exists
+            current[index] = config
+        }
+        saveServers(current)
+    }
+
+    fun addOrUpdateServers(configs: List<VpnServerConfig>) {
+        if (configs.isEmpty()) return
+        val current = getServers().toMutableList()
+        var changed = false
+        
+        configs.forEach { config ->
+            val index = current.indexOfFirst { it.id == config.id }
+            if (index == -1) {
+                current.add(config)
+                changed = true
+            } else {
+                if (current[index] != config) {
+                    current[index] = config
+                    changed = true
+                }
+            }
+        }
+        
+        if (changed) {
+            saveServers(current)
+            com.carnelia.vpn.utils.AppLogger.log("Repository: Bulk updated ${configs.size} servers")
+        }
+    }
+
+    fun removeSubscriptionServers(subId: String) {
+        val current = getServers().toMutableList()
+        val before = current.size
+        current.removeAll { it.subscriptionId == subId }
+        if (current.size != before) {
+            saveServers(current)
+            com.carnelia.vpn.utils.AppLogger.log("Repository: Removed ${before - current.size} subscription servers")
         }
     }
 

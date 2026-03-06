@@ -39,35 +39,51 @@ class OpenVpnProtocol : IVpnProtocol {
     
     private var connectionState = ConnectionState.DISCONNECTED
     private val stateListeners = mutableListOf<(ConnectionState) -> Unit>()
+    private val bytesListeners = mutableListOf<(Long, Long) -> Unit>()
     
+    private var bytesSent = 0L
+    private var bytesReceived = 0L
+
+    // Listener for library events
+    private val vpnStatusListener = object : de.blinkt.openvpn.core.VpnStatus.StateListener {
+        override fun updateState(state: String?, logmessage: String?, localizedResId: Int, level: de.blinkt.openvpn.core.ConnectionStatus?, intent: android.content.Intent?) {
+            val newState = when (level) {
+                de.blinkt.openvpn.core.ConnectionStatus.LEVEL_CONNECTED -> ConnectionState.CONNECTED
+                de.blinkt.openvpn.core.ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET,
+                de.blinkt.openvpn.core.ConnectionStatus.LEVEL_CONNECTING_SERVER_REPLIED -> ConnectionState.CONNECTING
+                de.blinkt.openvpn.core.ConnectionStatus.LEVEL_AUTH_FAILED,
+                de.blinkt.openvpn.core.ConnectionStatus.LEVEL_NONETWORK -> ConnectionState.ERROR
+                else -> ConnectionState.DISCONNECTED
+            }
+            updateConnectionState(newState)
+        }
+
+        override fun setConnectedVPN(uuid: String?) {}
+    }
+
+    private val vpnByteListener = object : de.blinkt.openvpn.core.VpnStatus.ByteCountListener {
+        override fun updateByteCount(inBytes: Long, outBytes: Long, diffIn: Long, diffOut: Long) {
+             bytesReceived = inBytes
+             bytesSent = outBytes
+             bytesListeners.forEach { it(bytesSent, bytesReceived) }
+        }
+    }
+
     override suspend fun prepare(): VpnErrorCode = VpnErrorCode.NO_ERROR
     
     override suspend fun start(config: VpnServerConfig): VpnErrorCode {
         updateConnectionState(ConnectionState.CONNECTING)
         try {
-            AppLogger.log("OpenVpnProtocol: Starting OpenVPN...")
+            AppLogger.log("OpenVpnProtocol: Starting OpenVPN UI...")
             
-            // Note: In a real implementation using ics-openvpn, 
-            // you typically construct a VpnProfile object from the .ovpn configuration string
-            // and then call VPNLaunchHelper.startOpenVpn(profile, context).
-            // However, ics-openvpn is designed to run as its OWN Service (OpenVPNService).
-            // Since WE are the VpnService (V2RayVpnService/CarneliaVpnService), we have a conflict.
-            // ics-openvpn supports "Remote Service" mode or embedded mode, but it's complex.
+            // Register listeners
+            de.blinkt.openvpn.core.VpnStatus.addStateListener(vpnStatusListener)
+            de.blinkt.openvpn.core.VpnStatus.addByteCountListener(vpnByteListener)
+
+            // Launch the helper which starts the activity
+            com.carnelia.vpn.utils.OpenVpnHelper.startVpn(com.carnelia.vpn.CarheliaApplication.instance, config)
             
-            // For now, unless we fully integrate the OpenVPN Service structure, this is a placeholder.
-            // But we have added the dependency, so classes are available.
-            
-            // Example of how to parse:
-            val ovpnContent = config.config["ovpn_data"] ?: return VpnErrorCode.CONFIGURATION_ERROR
-            // val profile = de.blinkt.openvpn.core.ConfigParser().parse(StringReader(ovpnContent))
-            
-            // Since we can't easily start it without conflicting with our Xray/Tun2Socks service,
-            // we will mark it as not fully supported yet in this hybrid mode.
-            
-            // To support OpenVPN properly, we would likely need to switch our App's Service
-            // to a wrapping service that can delegate to either Tun2Socks OR OpenVPN's native handler via JNI.
-            
-            throw Exception("OpenVPN Service Integration Pending (Requires Service Re-architecture)")
+            return VpnErrorCode.NO_ERROR
             
         } catch (e: Exception) {
             AppLogger.error("OpenVpnProtocol", e)
@@ -78,19 +94,32 @@ class OpenVpnProtocol : IVpnProtocol {
     
     override suspend fun stop() {
         updateConnectionState(ConnectionState.DISCONNECTING)
-        // Stop logic
+        de.blinkt.openvpn.core.VpnStatus.removeStateListener(vpnStatusListener)
+        de.blinkt.openvpn.core.VpnStatus.removeByteCountListener(vpnByteListener)
+        
+        // Try to stop service
+        try {
+            val intent = android.content.Intent(com.carnelia.vpn.CarheliaApplication.instance, de.blinkt.openvpn.core.OpenVPNService::class.java)
+            intent.action = de.blinkt.openvpn.core.OpenVPNService.DISCONNECT_VPN
+            com.carnelia.vpn.CarheliaApplication.instance.startService(intent)
+        } catch (e: Exception) {
+            AppLogger.error("OpenVpnProtocol: Stop failed", e)
+        }
+        
         updateConnectionState(ConnectionState.DISCONNECTED)
     }
     
     override fun getConnectionState(): ConnectionState = connectionState
     
-    override fun getBytesTransferred(): Pair<Long, Long> = Pair(0L, 0L)
+    override fun getBytesTransferred(): Pair<Long, Long> = Pair(bytesSent, bytesReceived)
     
     override fun onConnectionStateChanged(listener: (ConnectionState) -> Unit) {
         stateListeners.add(listener)
     }
     
-    override fun onBytesChanged(listener: (Long, Long) -> Unit) {}
+    override fun onBytesChanged(listener: (Long, Long) -> Unit) {
+        bytesListeners.add(listener)
+    }
     
     override fun onNetworkInterfaceCreated(fileDescriptor: android.os.ParcelFileDescriptor) {}
     
@@ -128,6 +157,25 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
         isRunning = true
         
         try {
+            // Check for Tor Mode
+            if (config.config["tor_mode"] == "true") {
+                AppLogger.log("XrayVpnProtocol: Starting Tor Service...")
+                com.carnelia.vpn.core.TorManager.startTor(context)
+                
+                // Wait for Tor to bootstrap (Max 60s)
+                try {
+                    withTimeout(60000) {
+                        while (!com.carnelia.vpn.core.TorManager.isConnected()) {
+                            delay(1000)
+                            // Optionally report detailed status if possible via callback
+                        }
+                    }
+                    AppLogger.log("XrayVpnProtocol: Tor Connected!")
+                } catch (e: TimeoutCancellationException) {
+                    AppLogger.error("Tor bootstrap timed out, proceeding anyway (might be slow)...")
+                }
+            }
+
             AppLogger.log("XrayVpnProtocol: Starting Xray Core via Process...")
             XrayCoreManager.startCore(context, config)
             
@@ -142,6 +190,7 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
         } catch (e: Exception) {
             AppLogger.error("XrayVpnProtocol: Start failed", e)
             XrayCoreManager.stopCore()
+            com.carnelia.vpn.core.TorManager.stopTor()
             return VpnErrorCode.PROTOCOL_ERROR
         }
     }
@@ -153,6 +202,7 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
             activeTunnel?.disconnect()
             activeTunnel = null
             XrayCoreManager.stopCore()
+            com.carnelia.vpn.core.TorManager.stopTor()
         } catch(e: Exception) {
              AppLogger.error("XrayVpnProtocol: Stop error", e)
         }

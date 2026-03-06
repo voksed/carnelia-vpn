@@ -9,6 +9,7 @@ import com.google.gson.reflect.TypeToken
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.Locale
 
 /**
  * Universal VPN Config Parser
@@ -19,22 +20,70 @@ object ConfigParser {
     private val gson = Gson()
 
     fun parse(input: String): VpnServerConfig? {
+        return try {
+            parseOrThrow(input)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    @Throws(IllegalArgumentException::class)
+    fun parseOrThrow(input: String): VpnServerConfig {
         val trimmed = input.trim()
+        if (trimmed.isEmpty()) error("Configuration string is empty", "Строка конфигурации пуста")
+        
+        val lower = trimmed.lowercase() // Use lowercase for prefix check
+
         return when {
-            trimmed.startsWith("ss://") -> parseShadowsocks(trimmed)
-            trimmed.startsWith("vless://") -> parseVless(trimmed)
-            trimmed.startsWith("vmess://") -> parseVmess(trimmed)
-            trimmed.startsWith("trojan://") -> parseTrojan(trimmed)
+            lower.startsWith("ss://") -> parseShadowsocks(trimmed)
+            lower.startsWith("vless://") -> parseVless(trimmed)
+            lower.startsWith("vmess://") -> parseVmess(trimmed)
+            lower.startsWith("trojan://") -> parseTrojan(trimmed)
             // Simple heuristic for OpenVPN text content
-            trimmed.contains("client") && trimmed.contains("remote ") -> parseOpenVpnContent(trimmed)
-            trimmed.contains("dev tun") -> parseOpenVpnContent(trimmed)
-            trimmed.startsWith("client\r\n") || trimmed.startsWith("client\n") -> parseOpenVpnContent(trimmed)
-            else -> null
+            lower.contains("client") && lower.contains("remote ") -> parseOpenVpnContent(trimmed)
+            lower.contains("dev tun") -> parseOpenVpnContent(trimmed)
+            lower.startsWith("client\r\n") || lower.startsWith("client\n") -> parseOpenVpnContent(trimmed)
+            // Attempt generic OpenVPN fallback if looks like config
+            lower.contains("remote ") && lower.contains("port ") -> parseOpenVpnContent(trimmed)
+            // Attempt to decode base64 if no prefix
+            isBase64(trimmed) -> parse(decodeBase64(trimmed)) ?: error("Failed to parse decoded config")
+            else -> error(
+                "Unknown protocol or invalid format. Supported: vless://, vmess://, ss://, trojan://, OpenVPN",
+                "Неизвестный формат ключа. Поддерживается: vless, vmess, ss, trojan, openvpn"
+            )
+        }
+    }
+
+    private fun isBase64(str: String): Boolean {
+        return try {
+            if (str.length < 10) return false
+            Base64.decode(str, Base64.DEFAULT)
+            true
+        } catch (e: Exception) { false }
+    }
+
+    private fun error(en: String, ru: String): Nothing {
+        val isRu = Locale.getDefault().language == "ru"
+        throw IllegalArgumentException(if (isRu) ru else en)
+    }
+
+    private fun decodeBase64(input: String): String {
+        return try {
+            String(
+                Base64.decode(input, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP),
+                StandardCharsets.UTF_8
+            )
+        } catch (e: Exception) {
+            try {
+                String(Base64.decode(input, Base64.DEFAULT), StandardCharsets.UTF_8)
+            } catch (e2: Exception) {
+                throw IllegalArgumentException("Base64 decode failed")
+            }
         }
     }
     
     fun parseOpenVpnContent(content: String): VpnServerConfig {
-        // Simple extraction of host for name
         var name = "OpenVPN Server"
         try {
             val remoteLine = content.lines().find { it.trim().startsWith("remote ") }
@@ -50,15 +99,13 @@ object ConfigParser {
             id = UUID.randomUUID().toString(),
             name = name,
             protocol = VpnProtocol.OPENVPN,
-            host = name, // Used for display
-            port = 1194, // Default, not strict
-            config = mapOf(
-                "ovpn_data" to content
-            )
+            host = name, 
+            port = 1194, 
+            config = mapOf("ovpn_data" to content)
         )
     }
 
-    private fun parseShadowsocks(url: String): VpnServerConfig? {
+    private fun parseShadowsocks(url: String): VpnServerConfig {
         try {
             var cleanUrl = url.substring(5)
             val tagIndex = cleanUrl.indexOf("#")
@@ -72,7 +119,6 @@ object ConfigParser {
                 cleanUrl = cleanUrl.substring(0, tagIndex)
             }
 
-            // Outline usually has /?outline=1
             val isOutline = url.contains("outline=1")
             
             val userPart: String
@@ -83,57 +129,83 @@ object ConfigParser {
                 userPart = parts[0]
                 hostPart = parts[1]
             } else {
-                // Try base64 decoding the whole thing (SIP002)
-                val decoded = String(Base64.decode(cleanUrl, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP))
+                val decoded = try {
+                     decodeBase64(cleanUrl)
+                } catch (e: Exception) {
+                     error("SS: Invalid Base64 config", "SS: Ошибка декодирования Base64")
+                }
+                
                 if (decoded.contains("@")) {
                      val parts = decoded.split("@")
                      userPart = parts[0]
                      hostPart = parts[1]
                 } else {
-                    return null
+                    error("SS: Malformed config (missing @)", "SS: Неверный формат ссылки (нет @)")
                 }
             }
 
             val methodPass = if (userPart.contains(":")) {
                 userPart.split(":", limit = 2)
             } else {
-                 val decodedAuth = String(Base64.decode(userPart, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP))
+                 val decodedAuth = try {
+                      decodeBase64(userPart)
+                 } catch (e: Exception) {
+                      error("SS: Invalid Auth Base64", "SS: Ошибка кодировки пароля")
+                 }
                  decodedAuth.split(":", limit = 2)
             }
 
-            if (methodPass.size != 2) return null
+            if (methodPass.size != 2) error("SS: Method/Password missing", "SS: Не указан метод шифрования или пароль")
             val method = methodPass[0]
             val password = methodPass[1]
 
-            val hostPort = hostPart.split("/")[0].split(":")
-            if (hostPort.size != 2) return null
-            val host = hostPort[0]
-            val port = hostPort[1].toIntOrNull() ?: return null
+            val hostStr: String
+            val portStr: String
+            
+            if (hostPart.startsWith("[")) {
+                val close = hostPart.indexOf("]")
+                if (close == -1) error("SS: Invalid IPv6", "SS: Некорректный IPv6")
+                hostStr = hostPart.substring(1, close)
+                if (hostPart.length > close + 1 && hostPart[close+1] == ':') {
+                    portStr = hostPart.substring(close+2)
+                } else {
+                    error("SS: Port missing", "SS: Не указан порт")
+                }
+            } else {
+                val hp = hostPart.split(":")
+                if (hp.size != 2) error("SS: Invalid Host:Port", "SS: Неверный формат Хост:Порт")
+                hostStr = hp[0]
+                portStr = hp[1]
+            }
+            
+            val port = portStr.toIntOrNull() ?: error("SS: Invalid Port", "SS: Некорректный порт")
 
             return VpnServerConfig(
                 id = UUID.randomUUID().toString(),
                 name = name,
                 protocol = if (isOutline) VpnProtocol.OUTLINE else VpnProtocol.SHADOWSOCKS,
-                host = host,
+                host = hostStr,
                 port = port,
                 config = mapOf(
                     "method" to method,
                     "password" to password
                 )
             )
+        } catch (e: IllegalArgumentException) {
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
-            return null
+            error("Shadowsocks error: ${e.message}", "Ошибка Shadowsocks: ${e.message}")
         }
     }
 
-    private fun parseVless(url: String): VpnServerConfig? {
+    private fun parseVless(url: String): VpnServerConfig {
         try {
             val uri = Uri.parse(url)
-            val userInfo = uri.userInfo ?: return null // UUID
-            val host = uri.host ?: return null
+            val userInfo = uri.userInfo ?: error("VLESS: User info (UUID) missing", "VLESS: Отсутствует UUID пользователя")
+            val host = uri.host ?: error("VLESS: Host / IP missing", "VLESS: Отсутствует адрес сервера")
             val port = uri.port
-            if (port == -1) return null
+            if (port == -1) error("VLESS: Port missing", "VLESS: Некорректный порт")
 
             val queryMap = mutableMapOf<String, String>()
             uri.queryParameterNames.forEach { key ->
@@ -152,9 +224,9 @@ object ConfigParser {
             config["sid"] = queryMap["sid"] ?: ""
             config["flow"] = queryMap["flow"] ?: ""
             
-            // XTLS-Reality checks
             if (config["security"] == "reality") {
-                config["publicKey"] = config["pbk"] ?: ""
+                val pbk = config["pbk"] ?: ""
+                config["publicKey"] = pbk
                 config["shortId"] = config["sid"] ?: ""
                 config["serverName"] = config["sni"] ?: ""
                 config["fingerprint"] = config["fp"] ?: "chrome"
@@ -168,30 +240,47 @@ object ConfigParser {
                 port = port,
                 config = config
             )
+        } catch (e: IllegalArgumentException) {
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
-            return null
+            error("VLESS parse error: ${e.message}", "Ошибка разбора VLESS: ${e.message}")
         }
     }
     
     // VMess usually uses base64 encoded JSON
-    private fun parseVmess(url: String): VpnServerConfig? {
+    private fun parseVmess(url: String): VpnServerConfig {
         try {
-            val base64 = url.removePrefix("vmess://")
-            val jsonString = String(Base64.decode(base64, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP))
-            val mapType = object : TypeToken<Map<String, String>>() {}.type
-            val data: Map<String, String> = gson.fromJson(jsonString, mapType)
+            val base64 = url.substring(8) // "vmess://" is 8 chars
+            val jsonString = try {
+                 decodeBase64(base64)
+            } catch (e: Exception) {
+                 error("VMess: Invalid Base64", "VMess: Некорректный Base64")
+            }
+            
+            val mapType = object : TypeToken<Map<String, Any>>() {}.type
+            val data: Map<String, Any> = try {
+                 gson.fromJson(jsonString, mapType)
+            } catch (e: Exception) {
+                 error("VMess: Invalid JSON", "VMess: Некорректный JSON конфигурации")
+            }
 
-            val ps = data["ps"] ?: "VMess Server"
-            val add = data["add"] ?: return null
-            val port = data["port"]?.toIntOrNull() ?: 443
-            val id = data["id"] ?: return null
-            val aid = data["aid"] ?: "0"
-            val net = data["net"] ?: "tcp"
-            val type = data["type"] ?: "none"
-            val host = data["host"] ?: ""
-            val path = data["path"] ?: ""
-            val tls = data["tls"] ?: ""
+            val ps = (data["ps"] as? String) ?: "VMess Server"
+            val add = (data["add"] as? String) ?: error("VMess: 'add' (address) missing", "VMess: Не указан адрес (add)")
+            val portParam = data["port"] 
+            val port = when(portParam) {
+                is Number -> portParam.toInt()
+                is String -> portParam.toIntOrNull() ?: 443
+                else -> 443
+            }
+
+            val id = (data["id"] as? String) ?: error("VMess: 'id' (UUID) missing", "VMess: Не указан UUID (id)")
+            val aid = (data["aid"] as? String) ?: "0"
+            val net = (data["net"] as? String) ?: "tcp"
+            val type = (data["type"] as? String) ?: "none"
+            val host = (data["host"] as? String) ?: ""
+            val path = (data["path"] as? String) ?: ""
+            val tls = (data["tls"] as? String) ?: ""
 
             return VpnServerConfig(
                 id = UUID.randomUUID().toString(),
@@ -210,19 +299,21 @@ object ConfigParser {
                 )
             )
 
+        } catch (e: IllegalArgumentException) {
+             throw e
         } catch (e: Exception) {
             e.printStackTrace()
-            return null
+             error("VMess parse error: ${e.message}", "Ошибка разбора VMess: ${e.message}")
         }
     }
 
-    private fun parseTrojan(url: String): VpnServerConfig? {
+    private fun parseTrojan(url: String): VpnServerConfig {
         try {
             val uri = Uri.parse(url)
-            val password = uri.userInfo ?: return null
-            val host = uri.host ?: return null
+            val password = uri.userInfo ?: error("Trojan: Password missing", "Trojan: Не указан пароль")
+            val host = uri.host ?: error("Trojan: Host missing", "Trojan: Не указан хост")
             val port = uri.port
-            if (port == -1) return null
+            if (port == -1) error("Trojan: Port missing", "Trojan: Не указан порт")
             
             val name = uri.fragment?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) } ?: "Trojan Server"
 
@@ -245,9 +336,11 @@ object ConfigParser {
                 )
             )
 
+        } catch (e: IllegalArgumentException) {
+             throw e
         } catch (e: Exception) {
              e.printStackTrace()
-             return null
+             error("Trojan error: ${e.message}", "Ошибка Trojan: ${e.message}")
         }
     }
 }

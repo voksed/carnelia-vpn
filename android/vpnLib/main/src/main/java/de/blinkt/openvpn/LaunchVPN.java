@@ -102,8 +102,10 @@ public class LaunchVPN extends Activity {
         public void onServiceConnected(ComponentName componentName, IBinder binder) {
             IServiceStatus service = IServiceStatus.Stub.asInterface(binder);
             try {
-                if (mTransientAuthPW != null)
+                if (mTransientAuthPW != null) {
+                    android.util.Log.d("LaunchVPN", "Setting cached password for UUID: " + mSelectedProfile.getUUIDString());
                     service.setCachedPassword(mSelectedProfile.getUUIDString(), PasswordCache.AUTHPASSWORD, mTransientAuthPW);
+                }
                 if (mTransientCertOrPCKS12PW != null)
                     service.setCachedPassword(mSelectedProfile.getUUIDString(), PasswordCache.PCKS12ORCERTPASSWORD, mTransientCertOrPCKS12PW);
 
@@ -161,9 +163,59 @@ public class LaunchVPN extends Activity {
         } else {
             mSelectedProfile = profileToConnect;
             mSelectedProfileReason = startReason;
-            launchVPN();
+            checkAndRequestNotificationPermission();
         }
 
+    }
+
+    private void checkAndRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+                return;
+            }
+        }
+        launchVPN();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == 101) {
+            if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                launchVPN();
+            } else {
+                showPermissionDeniedDialog();
+            }
+        } else {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
+    }
+
+    private void showPermissionDeniedDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Permission Required");
+        builder.setMessage("Notifications are needed to show VPN status. Please enable them in Settings.");
+        builder.setPositiveButton("Settings", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                Intent intent = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+                try {
+                    startActivityForResult(intent, 102);
+                } catch (ActivityNotFoundException e) {
+                    Intent i = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    i.setData(android.net.Uri.parse("package:" + getPackageName()));
+                    startActivityForResult(i, 102);
+                }
+            }
+        });
+        builder.setNegativeButton("Ignore", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                launchVPN();
+            }
+        });
+        builder.show();
     }
 
     private void askForPW(final int type) {
@@ -212,6 +264,7 @@ public class LaunchVPN extends Activity {
                         } else {
                             mSelectedProfile.mPassword = null;
                             mTransientAuthPW = pw;
+                            android.util.Log.d("LaunchVPN", "Transient password set for UUID: " + mSelectedProfile.getUUIDString());
                         }
                         mSelectedProfile.addChangeLogEntry("saved password");
                         ProfileManager.saveProfile( LaunchVPN.this, mSelectedProfile);
@@ -240,9 +293,21 @@ public class LaunchVPN extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
+        if (requestCode == 102) {
+            checkAndRequestNotificationPermission();
+            return;
+        }
+
         if (requestCode == START_VPN_PROFILE) {
             if (resultCode == Activity.RESULT_OK) {
                 int needpw = mSelectedProfile.needUserPWInput(mTransientCertOrPCKS12PW, mTransientAuthPW);
+                
+                android.util.Log.e("LaunchVPN_DEBUG", String.format("AuthType: %d, Username: '%s', Password: '%s', NeedPW: %d", 
+                    mSelectedProfile.mAuthenticationType, 
+                    mSelectedProfile.mUsername, 
+                    mSelectedProfile.mPassword, 
+                    needpw));
+
                 if (needpw != 0) {
                     VpnStatus.updateStateString("USER_VPN_PASSWORD", "", R.string.state_user_vpn_password,
                             ConnectionStatus.LEVEL_WAITING_FOR_USER_INPUT);
@@ -251,7 +316,8 @@ public class LaunchVPN extends Activity {
                     SharedPreferences prefs = Preferences.getDefaultSharedPreferences(this);
                     boolean showLogWindow = prefs.getBoolean("showlogwindow", true);
 
-                    if (!mhideLog && showLogWindow)
+                    // User requested strictly to see logs in window, so we force showLogWindow
+                    if (!mhideLog)
                         showLogWindow();
                     ProfileManager.updateLRU(this, mSelectedProfile);
                     VPNLaunchHelper.startOpenVpn(mSelectedProfile, getBaseContext(), mSelectedProfileReason, true);

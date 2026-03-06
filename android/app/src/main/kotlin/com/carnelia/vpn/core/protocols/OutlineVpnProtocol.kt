@@ -170,27 +170,23 @@ class OutlineVpnProtocol : IVpnProtocol {
     private fun startStatsLoop() {
         scope.launch {
             AppLogger.log("OutlineVpnProtocol: Stats loop started")
+            
+            // Capture baseline stats at start of session
+            val startRx = android.net.TrafficStats.getUidRxBytes(android.os.Process.myUid())
+            val startTx = android.net.TrafficStats.getUidTxBytes(android.os.Process.myUid())
+            
              while (isRunning) {
                  try {
-                     // Assuming Tun2socks.getUploadRate() / getDownloadRate() or accumulated bytes
-                     // Not available in standard go-tun2socks without modification
-                     // IF using Outline's fork, it uses a 'Choir' reporter passed to start.
+                     // Calculate delta since session start
+                     val currentRx = android.net.TrafficStats.getUidRxBytes(android.os.Process.myUid())
+                     val currentTx = android.net.TrafficStats.getUidTxBytes(android.os.Process.myUid())
                      
-                     // Since we can't easily implement a callback listener from Kotlin to Go without 
-                     // correct bindings, we might just poll the network interface usage if Android allowed it per-interface.
-                     // But VpnService doesn't expose per-interface stats easily.
-                     // Xray did it by querying the core.
+                     val sessionRx = if (currentRx != android.net.TrafficStats.UNSUPPORTED.toLong()) currentRx - startRx else 0L
+                     val sessionTx = if (currentTx != android.net.TrafficStats.UNSUPPORTED.toLong()) currentTx - startTx else 0L
                      
-                     // Fake stats for now to prevent 0 bytes (at least show something if we can)
-                     // Or rely on Android system stats if possible.
-                     
-                     val rx = android.net.TrafficStats.getTotalRxBytes()
-                     val tx = android.net.TrafficStats.getTotalTxBytes()
-                     // This is global, showing all app traffic, which is better than 0.
-                     
-                     if (rx != bytesReceived || tx != bytesSent) {
-                        bytesReceived = rx
-                        bytesSent = tx
+                     if (sessionRx != bytesReceived || sessionTx != bytesSent) {
+                        bytesReceived = sessionRx
+                        bytesSent = sessionTx
                         bytesListeners.forEach { it(bytesSent, bytesReceived) }
                      }
                  } catch (e: Exception) {

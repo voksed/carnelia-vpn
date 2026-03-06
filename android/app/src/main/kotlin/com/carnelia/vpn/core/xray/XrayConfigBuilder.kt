@@ -47,20 +47,27 @@ object XrayConfigBuilder {
 
         root.add("policy", policy)
 
-        // DNS
+        // DNS (DoH for security)
         val dns = JsonObject()
         val servers = JsonArray()
         
-        // Custom DNS injection
+        // Use DoH (DNS over HTTPS) by default to hide queries from ISP
         if (config.config.containsKey("dns_server")) {
+            // Respect custom DNS if provided (e.g. for private setups)
             servers.add(config.config["dns_server"])
         } else {
-            servers.add("8.8.8.8")
+            // Secure Public DoH
+            servers.add("https://1.1.1.1/dns-query") // Cloudflare
+            servers.add("https://8.8.8.8/dns-query") // Google
+            servers.add("https://9.9.9.9/dns-query") // Quad9
         }
         
-        servers.add("1.1.1.1")
-        servers.add("2001:4860:4860::8888") // IPv6 Google
+        servers.add("localhost") // Fallback
         dns.add("servers", servers)
+        
+        // DNS Query Strategy
+        dns.addProperty("queryStrategy", "UseIP")
+        
         root.add("dns", dns)
 
         // Inbounds
@@ -76,6 +83,16 @@ object XrayConfigBuilder {
             addProperty("udp", true)
             addProperty("userLevel", 0) // Bind to Level 0 policy
             // No accounts for system stats
+        })
+        
+        // Tor SOCKS Inbound
+        val torInbound = JsonObject()
+        torInbound.addProperty("tag", "tor_in")
+        torInbound.addProperty("port", 10850) // Dedicated port for Tor
+        torInbound.addProperty("protocol", "socks")
+        torInbound.add("settings", JsonObject().apply {
+            addProperty("auth", "noauth")
+            addProperty("udp", false)
         })
         
         // Local HTTP inbound (for ProxyInfo)
@@ -111,12 +128,27 @@ object XrayConfigBuilder {
         // httpInbound.add("sniffing", sniffing) // Optional for http
         
         inbounds.add(socksInbound)
+        inbounds.add(torInbound)
         inbounds.add(httpInbound) // Add HTTP inbound
         inbounds.add(ssInbound)
         root.add("inbounds", inbounds)
 
         // Outbounds
         val outbounds = JsonArray()
+        
+        // Tor Outbound (SOCKS Proxy to Orbot/Tor)
+        val torOutbound = JsonObject()
+        torOutbound.addProperty("tag", "tor_out")
+        torOutbound.addProperty("protocol", "socks")
+        val torSettings = JsonObject()
+        val torServer = JsonArray()
+        val torNode = JsonObject()
+        torNode.addProperty("address", "127.0.0.1")
+        torNode.addProperty("port", 9050) // Standard Tor SOCKS port
+        torServer.add(torNode)
+        torSettings.add("servers", torServer)
+        torOutbound.add("settings", torSettings)
+        outbounds.add(torOutbound)
         
         // Proxy Outbound
         val proxyOutbound = JsonObject()
@@ -182,14 +214,29 @@ object XrayConfigBuilder {
             serverNode.add("users", users)
             vnext.add(serverNode)
     
-            if (config.protocol == VpnProtocol.SHADOWSOCKS || config.protocol == VpnProtocol.OUTLINE) {
+            if (config.protocol == VpnProtocol.SHADOWSOCKS || config.protocol == VpnProtocol.OUTLINE || config.protocol == VpnProtocol.SOCKS) {
                  val serversArr = JsonArray()
                  val ssServer = JsonObject()
                  ssServer.addProperty("address", config.host)
                  ssServer.addProperty("port", config.port)
-                 ssServer.addProperty("method", config.config["method"])
-                 ssServer.addProperty("password", config.config["password"])
-                 ssServer.addProperty("level", 0)
+                 
+                 if (config.protocol == VpnProtocol.SOCKS) {
+                     // For SOCKS
+                     val socksUsers = JsonArray()
+                     if (config.config.containsKey("username")) {
+                         val u = JsonObject()
+                         u.addProperty("user", config.config["username"])
+                         u.addProperty("pass", config.config["password"])
+                         u.addProperty("level", 0)
+                         socksUsers.add(u)
+                     }
+                     ssServer.add("users", socksUsers)
+                 } else {
+                     // Shadowsocks
+                     ssServer.addProperty("method", config.config["method"])
+                     ssServer.addProperty("password", config.config["password"])
+                     ssServer.addProperty("level", 0)
+                 }
                  serversArr.add(ssServer)
                  settings.add("servers", serversArr)
             } else {
@@ -306,8 +353,8 @@ object XrayConfigBuilder {
         val routing = JsonObject()
         routing.addProperty("domainStrategy", "IPIfNonMatch")
         val rules = JsonArray()
-        
-        // Private IP rule -> Direct
+
+        // Private IP rule -> Direct (Added FIRST to ensure local traffic works)
         val privateRule = JsonObject()
         privateRule.addProperty("type", "field")
         privateRule.addProperty("outboundTag", "direct")
@@ -319,22 +366,59 @@ object XrayConfigBuilder {
         privateRule.add("ip", ipCidr)
         rules.add(privateRule)
         
+        // Tor Mode Rule
+        if (config.config["tor_mode"] == "true") {
+             val torAllRule = JsonObject()
+             torAllRule.addProperty("type", "field")
+             torAllRule.addProperty("outboundTag", "tor_out")
+             torAllRule.addProperty("network", "tcp,udp")
+             rules.add(torAllRule)
+        }
+        
+        // Tor Rules (.onion -> Tor)
+        val torRule = JsonObject()
+        torRule.addProperty("type", "field")
+        torRule.addProperty("outboundTag", "tor_out")
+        val torDomains = JsonArray()
+        torDomains.add("domain:onion")
+        torRule.add("domain", torDomains)
+        rules.add(torRule)
+        
         // RU Bypass (Smart Routing)
-        // Hardcoded domains to avoid geoip asset dependency
         if (config.config["bypass_ru"] == "true") {
              val ruRule = JsonObject()
              ruRule.addProperty("type", "field")
              ruRule.addProperty("outboundTag", "direct") // go direct
-             val domains = JsonArray()
-             domains.add("domain:ru")
-             domains.add("domain:su")
-             domains.add("domain:xn--p1ai") // .рф punycode
-             domains.add("domain:yandex.ru")
-             domains.add("domain:vk.com")
-             domains.add("domain:mail.ru")
-             domains.add("domain:gosuslugi.ru")
-             domains.add("domain:sberbank.ru")
-             ruRule.add("domain", domains)
+             
+             // GeoSite/GeoIP Logic
+             val context = com.carnelia.vpn.CarheliaApplication.instance
+             val geoSiteExists = com.carnelia.vpn.core.AssetsManager.getGeoSitePath(context) != null
+             val geoIpExists = com.carnelia.vpn.core.AssetsManager.getGeoIpPath(context) != null
+             
+             if (geoSiteExists) {
+                 val domains = JsonArray()
+                 domains.add("geosite:ru")
+                 domains.add("geosite:category-gov-ru")
+                 ruRule.add("domain", domains)
+             } else {
+                 val domains = JsonArray()
+                 domains.add("domain:ru")
+                 domains.add("domain:su")
+                 domains.add("domain:xn--p1ai") // .рф punycode
+                 domains.add("domain:yandex.ru")
+                 domains.add("domain:vk.com")
+                 domains.add("domain:mail.ru")
+                 domains.add("domain:gosuslugi.ru")
+                 domains.add("domain:sberbank.ru")
+                 ruRule.add("domain", domains)
+             }
+             
+             if (geoIpExists && geoSiteExists) { // Only use IP if domains are also handled, for consistency
+                 val ips = JsonArray()
+                 ips.add("geoip:ru")
+                 ruRule.add("ip", ips)
+             }
+             
              rules.add(ruRule)
         }
         
@@ -351,6 +435,7 @@ object XrayConfigBuilder {
              VpnProtocol.TROJAN -> "trojan"
              VpnProtocol.SHADOWSOCKS, VpnProtocol.OUTLINE -> "shadowsocks"
              VpnProtocol.WIREGUARD -> "wireguard"
+             VpnProtocol.SOCKS -> "socks"
              else -> "vless"
         }
     }

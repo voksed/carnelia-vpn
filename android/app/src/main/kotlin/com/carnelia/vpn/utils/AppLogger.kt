@@ -21,19 +21,24 @@ object AppLogger {
 
     fun log(message: String) {
         addEntry(LogLevel.INFO, message)
-        android.util.Log.i("CarneliaVPN", message)
+        android.util.Log.i("CarneliaDebug", message)
+        System.out.println("CarneliaDebug: " + message)
     }
 
     fun debug(message: String) {
         addEntry(LogLevel.DEBUG, message)
-        android.util.Log.d("CarneliaVPN", message)
+        android.util.Log.d("CarneliaDebug", message)
+        System.out.println("CarneliaDebug: " + message)
     }
 
-    fun error(message: String, e: Throwable? = null) {
-        val msg = if (e != null) "$message: ${e.message}" else message
-        addEntry(LogLevel.ERROR, msg)
-        android.util.Log.e("CarneliaVPN", msg, e)
+    fun error(message: String, throwable: Throwable? = null) {
+        addEntry(LogLevel.ERROR, message)
+        android.util.Log.e("CarneliaDebug", message, throwable)
+        System.err.println("CarneliaDebug: " + message)
+        throwable?.printStackTrace()
     }
+
+
 
     private fun addEntry(level: LogLevel, message: String) {
         if (_logs.size > 1000) {

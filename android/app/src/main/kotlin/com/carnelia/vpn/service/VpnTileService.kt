@@ -6,7 +6,9 @@ import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
+import kotlinx.coroutines.*
 import com.carnelia.vpn.core.ConnectionState
+import com.carnelia.vpn.core.VpnGlobalState
 import com.carnelia.vpn.data.ServerRepository
 import com.carnelia.vpn.MainActivity
 import com.carnelia.vpn.utils.AppLogger
@@ -14,16 +16,40 @@ import com.carnelia.vpn.utils.AppLogger
 @RequiresApi(Build.VERSION_CODES.N)
 class VpnTileService : TileService() {
 
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var job: Job? = null
+
     override fun onStartListening() {
         super.onStartListening()
-        updateTileState()
+        startListeningState()
     }
 
-    private fun updateTileState() {
+    override fun onStopListening() {
+        super.onStopListening()
+        stopListeningState()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
+    }
+
+    private fun startListeningState() {
+        job?.cancel()
+        job = scope.launch {
+            VpnGlobalState.connectionState.collect { state ->
+                updateTileState(state)
+            }
+        }
+    }
+
+    private fun stopListeningState() {
+        job?.cancel()
+        job = null
+    }
+
+    private fun updateTileState(state: ConnectionState) {
         val tile = qsTile ?: return
-        
-        // Check actual service state (requires CarheliaVpnService.currentState to be accessible)
-        val state = CarheliaVpnService.currentState
         
         when (state) {
             ConnectionState.CONNECTED -> {

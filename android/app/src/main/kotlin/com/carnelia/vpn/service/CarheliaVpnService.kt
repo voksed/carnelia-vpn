@@ -16,6 +16,8 @@ import com.carnelia.vpn.utils.PrefsManager
 import com.carnelia.vpn.core.VpnGlobalState
 
 import android.service.quicksettings.TileService
+import com.carnelia.vpn.core.TrafficStatsManager
+import com.carnelia.vpn.core.TrafficSession
 
 /**
  * Carnelia VPN Service
@@ -37,6 +39,7 @@ class CarheliaVpnService : VpnService() {
     
     private lateinit var vpnManager: VpnManager
     private var currentInterface: ParcelFileDescriptor? = null
+    private var connectionStartTime: Long = 0
 
     inner class LocalBinder : Binder() {
         fun getService(): CarheliaVpnService = this@CarheliaVpnService
@@ -79,8 +82,10 @@ class CarheliaVpnService : VpnService() {
                     }
                 }
                 ACTION_DISCONNECT -> {
-                    vpnManager.disconnect()
-                    stopSelf()
+                    scope.launch {
+                        vpnManager.disconnect()
+                        stopSelf()
+                    }
                 }
                 else -> {}
             }
@@ -92,7 +97,11 @@ class CarheliaVpnService : VpnService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        vpnManager.disconnect()
+        runBlocking {
+            withContext(NonCancellable) {
+                vpnManager.disconnect()
+            }
+        }
         vpnManager.destroy()
         scope.cancel()
         currentInterface?.close()
@@ -104,6 +113,25 @@ class CarheliaVpnService : VpnService() {
             AppLogger.log("Service: State changed to $state")
             VpnGlobalState.updateState(state)
             
+            if (state == ConnectionState.CONNECTED) {
+                connectionStartTime = System.currentTimeMillis()
+            } else if (state == ConnectionState.DISCONNECTED) {
+                // Save Statistics
+                val endTime = System.currentTimeMillis()
+                val duration = (endTime - connectionStartTime) / 1000
+                if (connectionStartTime > 0 && duration > 5) { // Only save sessions > 5 seconds
+                    val finalStats = VpnGlobalState.stats.value
+                    if (finalStats.bytesReceived > 0 || finalStats.bytesSent > 0) {
+                        AppLogger.log("Service: Saving session. Duration: ${duration}s, Rx: ${finalStats.bytesReceived}, Tx: ${finalStats.bytesSent}")
+                        TrafficStatsManager.saveSession(
+                            this@CarheliaVpnService,
+                            TrafficSession(connectionStartTime, duration, finalStats.bytesReceived, finalStats.bytesSent)
+                        )
+                    }
+                }
+                connectionStartTime = 0
+            }
+
             if (android.os.Build.VERSION.SDK_INT >= 24) {
                 try {
                     TileService.requestListeningState(this, android.content.ComponentName(this, VpnTileService::class.java))
@@ -114,7 +142,13 @@ class CarheliaVpnService : VpnService() {
 
             when (state) {
                 ConnectionState.CONNECTED -> {
+                    // Start measuring session duration
+                    connectionStartTime = System.currentTimeMillis()
                     establishVpnInterface()
+                }
+                ConnectionState.CONNECTING -> {
+                     // Reset global stats to avoid phantom usage from previous sessions
+                     VpnGlobalState.updateStats(VpnStats(0, 0))
                 }
                 ConnectionState.DISCONNECTED -> {
                     // Soft Kill Switch Logic:
@@ -263,10 +297,25 @@ class CarheliaVpnService : VpnService() {
 
     private fun updateNotification(stats: com.carnelia.vpn.core.VpnStats) {
         try {
+            val rx = android.text.format.Formatter.formatFileSize(this, stats.bytesReceived)
+            val tx = android.text.format.Formatter.formatFileSize(this, stats.bytesSent)
+            
+            // Calculate Duration
+            var durationText = ""
+            if (connectionStartTime > 0) {
+                val diff = (System.currentTimeMillis() - connectionStartTime) / 1000
+                val h = diff / 3600
+                val m = (diff % 3600) / 60
+                val s = diff % 60
+                durationText = if (h > 0) String.format("%02d:%02d:%02d • ", h, m, s) else String.format("%02d:%02d • ", m, s)
+            }
+            
+            val text = "$durationText↓ $rx ↑ $tx"
+            
             if (android.os.Build.VERSION.SDK_INT >= 34) {
-                startForeground(1, createNotification("↓ ${stats.bytesReceived} B ↑ ${stats.bytesSent} B"), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                startForeground(1, createNotification(text), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
             } else {
-                startForeground(1, createNotification("↓ ${stats.bytesReceived} B ↑ ${stats.bytesSent} B"))
+                startForeground(1, createNotification(text))
             }
         } catch (e: Exception) {
             // Logs might be too frequent here, limiting?

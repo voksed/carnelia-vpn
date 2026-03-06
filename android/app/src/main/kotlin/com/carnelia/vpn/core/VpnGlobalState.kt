@@ -11,6 +11,11 @@ object VpnGlobalState {
     private val _stats = MutableStateFlow(VpnStats())
     val stats: StateFlow<VpnStats> = _stats.asStateFlow()
 
+    // New Features Flags (Default to TRUE for the update)
+    var isNetShieldEnabled: Boolean = true
+    var isStealthModeEnabled: Boolean = true
+    var isSecureKeyCheckEnabled: Boolean = true
+
     fun updateState(state: ConnectionState) {
         _connectionState.value = state
     }

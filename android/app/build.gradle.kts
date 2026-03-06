@@ -11,8 +11,10 @@ android {
         applicationId = "com.carnelia.vpn"
         minSdk = 26
         targetSdk = 34
-        versionCode = 16
-        versionName = "1.1.0"
+        versionCode = 24 // Incremented for v2
+        versionName = "2.0"
+        
+        setProperty("archivesBaseName", "CarneliaVPN_v${versionName}")
     }
 
     signingConfigs {
@@ -26,7 +28,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -104,6 +106,13 @@ dependencies {
     // VPN & Networking
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     
+    // Tor Android (Allows running Tor without Orbit)
+    implementation("info.guardianproject:tor-android:0.4.6.10") 
+    implementation("info.guardianproject:jtorctl:0.4")
+    
+    // I2P Android Client Helper
+    implementation("net.i2p.android:helper:0.9.5")
+
     // Outline VPN SDK (when available)
     // implementation("org.outline:outline-android:1.0.0")
     
@@ -127,8 +136,13 @@ dependencies {
     // Logging
     implementation("com.google.code.findbugs:jsr305:3.0.2")
     implementation("androidx.work:work-runtime-ktx:2.8.1")
+    implementation("androidx.webkit:webkit:1.9.0")
 
     // Testing
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.0")
     testImplementation("junit:junit:4.13.2")
+
+    // QR Code
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.2")
 }

@@ -18,6 +18,33 @@
     <string name="parsing_error">Parsing error: %1$s</string>
     <string name="add_action">Add</string>
     <string name="cancel_action">Cancel</string>
+    <string name="scan_button">Scan</string>
+    <string name="share_button">Share</string>
+    <string name="menu_title">Menu</string>
+    <string name="orbot_title">Orbot (Tor)</string>
+    <string name="private_browser_title">Private Browser</string>
+    <string name="settings_title_menu">Settings</string>
+    <string name="tor_i2p_settings">Tor &amp; I2P Settings</string>
+    <string name="scan_to_import">Scan to Import</string>
+    <string name="close_button">Close</string>
+    <string name="error_generating_qr">Error generating QR</string>
+    <string name="no_server_selected">No server selected</string>
+    <string name="import_tooltip">Import from Clipboard</string>
+    <string name="scan_tooltip">Scan QR Code</string>
+    <string name="share_tooltip">Share Configuration</string>
+    <string name="orbot_enabled">Orbot Enabled</string>
+    <string name="orbot_disabled">Orbot Disabled</string>
+    <string name="browser_opening">Opening Browser...</string>
+    <string name="status_secured">SECURED</string>
+    <string name="status_connecting">CONNECTING...</string>
+    <string name="status_not_protected">NOT PROTECTED</string>
+    <string name="select_server_btn">Select Server</string>
+    <string name="received_label">RECEIVED</string>
+    <string name="sent_label">SENT</string>
+    <string name="quick_connect">QUICK CONNECT</string>
+    <string name="disconnect_caps">DISCONNECT</string>
+    <string name="ton_vpn_title">TON VPN</string>
+    <string name="carnelia_vpn_title">CARNELIA VPN</string>
     <string name="status_active">● ACTIVE</string>
     <string name="status_inactive">● INACTIVE</string>
     <string name="status_error">● ERROR</string>
@@ -100,4 +127,145 @@
     <string name="frag_desc_light">Light: Fast speed, basic DPI bypass. Splits ClientHello (1-1).</string>
     <string name="frag_desc_balanced">Balanced: Good speed/stealth balance. Random fragments (1-2).</string>
     <string name="frag_desc_aggressive">Aggressive: High stealth, slower. Many small fragments (2-5).</string>
+    
+    <!-- Tunnel Settings -->
+    <string name="tunnel_settings_section">TUNNEL SETTINGS</string>
+    <string name="use_mux_title">Use Mux (Multiplexing)</string>
+    <string name="use_mux_summary">Combine multiple requests into one connection (reduces latency).</string>
+    <string name="preferred_ip_title">Preferred IP Type</string>
+    <string name="ip_type_auto">Auto</string>
+    <string name="ip_type_ipv4">IPv4</string>
+    <string name="ip_type_ipv6">IPv6</string>
+    <string name="allow_lan_title">Allow LAN Connections</string>
+    <string name="allow_lan_summary">Share VPN connection with other devices on local network.</string>
+    <string name="auto_start_title">App Auto-Start</string>
+    <string name="auto_start_summary">Launch Carnelia VPN on device boot.</string>
+
+    <!-- Auto Connect Feature -->
+    <string name="smart_auto_connect_title">Smart Auto-Connect</string>
+    <string name="auto_connect_wifi_title">Auto-connect on Wi-Fi</string>
+    <string name="auto_connect_wifi_summary">Connect when joining Wi-Fi networks</string>
+    <string name="auto_connect_mobile_title">Auto-connect on Cellular</string>
+    <string name="auto_connect_mobile_summary">Connect when using Mobile Data</string>
+
+    <!-- Server Dialogs -->
+    <string name="connection_check_title">Connection Check</string>
+    <string name="checking_status">Checking...</string>
+    <string name="ok_button">OK</string>
+    <string name="edit_server_title">Edit Server</string>
+    <string name="edit_server_instruction">Update server details below.</string>
+    <string name="server_name_label">Server Name</string>
+    <string name="server_name_optional_label">Server Name (Optional)</string>
+    <string name="new_key_label">New Key (Leave empty to keep current)</string>
+    <string name="key_placeholder">ss://... or vless://...</string>
+    <string name="username_label">Username</string>
+    <string name="password_label">Password</string>
+    <string name="save_button">Save</string>
+    <string name="server_updated_toast">Server updated</string>
+
+    <!-- Statistics Screen -->
+    <string name="stats_screen_title">Traffic History</string>
+    <string name="clear_history">Clear History</string>
+    <string name="history_empty">No connection history yet.</string>
+    <string name="unit_auto">Auto</string>
+    <string name="unit_mb">MB</string>
+    <string name="unit_gb">GB</string>
+    <string name="total_session">Total</string>
+    <string name="date_header">Date</string>
+    <string name="downloaded_header">Download</string>
+    <string name="uploaded_header">Upload</string>
+
+    <!-- New Social & Report -->
+    <string name="telegram_news_channel">News Channel</string>
+    <string name="bug_report_subject">Carnelia VPN Bug Report</string>
+    <string name="bug_report_body_template">
+Describe the problem here:
+
+----------------------------
+Technical Info (Do not delete):
+Device: %1$s
+Android: %2$s
+App Version: %3$s
+Region: %4$s
+Last Error: %5$s
+----------------------------
+    </string>
+    <!-- Advanced Protection -->
+    <string name="advanced_protection_section">ADVANCED PROTECTION</string>
+    <string name="netshield_title">AdGuard NetShield</string>
+    <string name="netshield_desc">Blocks ads, trackers and malicious domains at DNS level.</string>
+    <string name="stealth_mode_title">Stealth Mode v2.0</string>
+    <string name="stealth_mode_desc">Forces strict TCP/TLS rules. Fixes YouTube buffering and severe DPI blocks.</string>
+    <string name="secure_key_title">Secure Key Audit</string>
+    <string name="secure_key_desc">Warns about unsafe, unencrypted, or suspicious keys before connection.</string>
+
+    <!-- Security Check Report -->
+    <string name="security_check_title">Security Check</string>
+    <string name="security_high">High Security</string>
+    <string name="security_medium">Medium Security</string>
+    <string name="security_low">Low Security</string>
+
+    <!-- Security Analysis Report (used in SecurityUtils) -->
+    <string name="sec_report_high_intro">✅ This key is highly secure.\n\n</string>
+    <string name="sec_report_med_intro">⚠️ Good key, but might be blocked by strict DPI.\n\n</string>
+    <string name="sec_report_low_intro">⛔ Key uses outdated encryption or obfuscation.\n\n</string>
+
+    <string name="sec_proto_vless">• Protocol: VLESS (Modern, fast).\n</string>
+    <string name="sec_flow_vision">• Flow: XTLS-Vision (Excellent detection protection).\n</string>
+    <string name="sec_security_reality">• Security: REALITY (Highest camouflage as Google/Microsoft).\n</string>
+    <string name="sec_security_tls">• Security: TLS (Good encryption, like HTTPS).\n</string>
+    <string name="sec_security_none">⚠ Security: None/Plain (Traffic is unencrypted or easily detected).\n</string>
+    <string name="sec_proto_vmess">• Protocol: VMess (Standard, vulnerable to probing).\n</string>
+    <string name="sec_obfu_tls">• Obfuscation: TLS/WebSocket (Decent stealth).\n</string>
+    <string name="sec_proto_ss2022">• Protocol: Shadowsocks 2022 (Improved, replay protection).\n</string>
+    <string name="sec_proto_ss">• Protocol: Shadowsocks (Classic. May be blocked by DPI).\n</string>
+    <string name="sec_proto_wg">• Protocol: WireGuard (Max speed &amp; crypto. UDP may be blocked).\n</string>
+    <string name="sec_proto_outline">• Protocol: Outline (Resistant to blocks, but not perfect).\n</string>
+    <string name="sec_proto_openvpn">• Protocol: OpenVPN (Reliable but slow).\n</string>
+    <string name="sec_proto_other">• Protocol: %1$s (Generic).\n</string>
+
+    <string name="sec_port_443">• Port: 443 (Component masquerades as HTTPS).\n</string>
+    <string name="sec_port_80">⚠ Port: 80 (Plain HTTP. Suspicious for VPN).\n</string>
+    <string name="sec_port_other">• Port: %1$d (Non-standard port).\n</string>
+    <string name="theme_carnelia">Carnelia VPN</string>
+    <string name="theme_cyberpunk">Cyberpunk</string>
+    <string name="theme_matrix">Matrix</string>
+    <string name="theme_purple">Purple</string>
+    <string name="theme_light_blue">Light Blue</string>
+    <string name="theme_light_green">Light Green</string>
+    <string name="theme_light_pink">Light Pink</string>
+    <string name="theme_light_purple">Light Purple</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_ton">Toncoin Style</string>
+    <string name="theme_system">System</string>
+    <string name="theme_secret">Voks</string>
+    
+    <!-- Games -->
+    <string name="game_miner_title">Carnelia Miner</string>
+    <string name="game_miner_score">Balance: %1$d TON</string>
+    <string name="game_miner_tap">TAP TO MINE</string>
+
+    <!-- Donation & Theming -->
+    <string name="donation_section_title">Project Support</string>
+    <string name="donate_dev_title">Support Developer</string>
+    <string name="donate_dev_desc">Donate &amp; Support</string>
+    <string name="app_theme_title">App Theme</string>
+    <string name="donate_page_header">Support Carnelia VPN</string>
+    <string name="donate_page_body">The app is completely free and ad-free.\nServers are paid from my own pocket.\nIf you like the service, you can support the project with any amount.</string>
+    <string name="donate_ton_title">TON Crypto</string>
+    <string name="address_copied_toast">Address copied!</string>
+    <string name="copy_address_btn">Copy Address</string>
+
+    <!-- Tor Settings -->
+    <string name="tor_integration_title">Tor Network Integration</string>
+    <string name="tor_internal_title">Use Built-in Tor</string>
+    <string name="tor_external_title">Use External Orbot App</string>
+    <string name="tor_internal_desc">Self-contained. Heavier on battery.</string>
+    <string name="tor_external_desc">Routes via Orbot app. Requires Orbot installed.</string>
+    <string name="mux_tcp_concurrency">TCP Connections</string>
+    <string name="mux_udp_concurrency">xUDP Connections</string>
+    <string name="mux_quic_mode">QUIC Handling</string>
+    <string name="quic_mode_reject">Reject (Recommended)</string>
+    <string name="quic_mode_allow">Allow</string>
 </resources>

@@ -18,6 +18,33 @@
     <string name="parsing_error">Ошибка парсинга: %1$s</string>
     <string name="add_action">Добавить</string>
     <string name="cancel_action">Отмена</string>
+    <string name="scan_button">Сканировать</string>
+    <string name="share_button">Поделиться</string>
+    <string name="menu_title">Меню</string>
+    <string name="orbot_title">Orbot (Tor)</string>
+    <string name="private_browser_title">Приватный браузер</string>
+    <string name="settings_title_menu">Настройки</string>
+    <string name="tor_i2p_settings">Настройки Tor &amp; I2P</string>
+    <string name="scan_to_import">Сканировать для импорта</string>
+    <string name="close_button">Закрыть</string>
+    <string name="error_generating_qr">Ошибка создания QR</string>
+    <string name="no_server_selected">Сервер не выбран</string>
+    <string name="import_tooltip">Вставить из буфера</string>
+    <string name="scan_tooltip">Сканировать QR</string>
+    <string name="share_tooltip">Поделиться конфигурацией</string>
+    <string name="orbot_enabled">Orbot включен</string>
+    <string name="orbot_disabled">Orbot выключен</string>
+    <string name="browser_opening">Запуск браузера...</string>
+    <string name="status_secured">ЗАЩИЩЕНО</string>
+    <string name="status_connecting">ПОДКЛЮЧЕНИЕ...</string>
+    <string name="status_not_protected">НЕ ЗАЩИЩЕНО</string>
+    <string name="select_server_btn">Выбрать сервер</string>
+    <string name="received_label">ПОЛУЧЕНО</string>
+    <string name="sent_label">ОТПРАВЛЕНО</string>
+    <string name="quick_connect">БЫСТРОЕ ПОДКЛЮЧЕНИЕ</string>
+    <string name="disconnect_caps">ОТКЛЮЧИТЬ</string>
+    <string name="ton_vpn_title">TON VPN</string>
+    <string name="carnelia_vpn_title">CARNELIA VPN</string>
     <string name="status_active">● АКТИВНО</string>
     <string name="status_inactive">● НЕ АКТИВНО</string>
     <string name="status_error">● ОШИБКА</string>
@@ -100,4 +127,142 @@
     <string name="frag_desc_light">Лайт: Высокая скорость, базовый обход. Разбивает только начало (ClientHello).</string>
     <string name="frag_desc_balanced">Баланс: Оптимально для большинства провайдеров (Рандом 1-2 пакета).</string>
     <string name="frag_desc_aggressive">Агрессивный: Максимальная скрытность, ниже скорость. Сильная фрагментация.</string>
+
+    <!-- Auto Connect Feature -->
+    <string name="smart_auto_connect_title">Умное авто-подключение</string>
+    <string name="auto_connect_wifi_title">Авто-подключение по Wi-Fi</string>
+    <string name="auto_connect_wifi_summary">Подключаться при использовании Wi-Fi</string>
+    <string name="auto_connect_mobile_title">Авто-подключение по сотовой сети</string>
+    <string name="auto_connect_mobile_summary">Подключаться при использовании мобильных данных</string>
+
+    <!-- Server Dialogs -->
+    <string name="connection_check_title">Проверка подключения</string>
+    <string name="checking_status">Проверка...</string>
+    <string name="ok_button">ОК</string>
+    <string name="edit_server_title">Редактировать сервер</string>
+    <string name="edit_server_instruction">Обновите данные сервера ниже.</string>
+    <string name="server_name_label">Имя сервера</string>
+    <string name="server_name_optional_label">Имя сервера (необязательно)</string>
+    <string name="new_key_label">Новый ключ (оставьте пустым для сохранения)</string>
+    <string name="key_placeholder">ss://... или vless://...</string>
+    <string name="username_label">Имя пользователя</string>
+    <string name="password_label">Пароль</string>
+    <string name="save_button">Сохранить</string>
+    <string name="server_updated_toast">Сервер обновлен</string>
+
+    <!-- Statistics Screen -->
+    <string name="stats_screen_title">История трафика</string>
+    <string name="clear_history">Очистить историю</string>
+    <string name="history_empty">История подключений пуста.</string>
+    <string name="unit_auto">Авто</string>
+    <string name="unit_mb">МБ</string>
+    <string name="unit_gb">ГБ</string>
+    <string name="total_session">Всего</string>
+    <string name="date_header">Дата</string>
+    <string name="downloaded_header">Скачано</string>
+    <string name="uploaded_header">Загружено</string>
+
+    <!-- New Social & Report -->
+    <string name="telegram_news_channel">Канал новостей</string>
+    <string name="bug_report_subject">Сообщение об ошибке Carnelia VPN</string>
+    <string name="bug_report_body_template">
+Опишите проблему здесь:
+
+----------------------------
+Техническая информация (Не удалять):
+Устройство: %1$s
+Android: %2$s
+Версия приложения: %3$s
+Регион: %4$s
+Последняя ошибка: %5$s
+----------------------------
+    </string>
+    <!-- Advanced Protection -->
+    <string name="advanced_protection_section">ПРОДВИНУТАЯ ЗАЩИТА</string>
+    <string name="netshield_title">AdGuard NetShield</string>
+    <string name="netshield_desc">Блокирует рекламу, трекеры и опасные домены на уровне DNS.</string>
+    <string name="stealth_mode_title">Stealth Mode v2.0</string>
+    <string name="stealth_mode_desc">Принудительно использует TCP/TLS. Исправляет YouTube и обходит жесткие DPI блокировки.</string>
+    <string name="secure_key_title">Аудит Ключей</string>
+    <string name="secure_key_desc">Предупреждает о небезопасных, незашифрованных или подозрительных ключах.</string>
+
+    <!-- Security Check Report -->
+    <string name="security_check_title">Проверка Безопасности</string>
+    <string name="security_high">Высокая Безопасность</string>
+    <string name="security_medium">Средняя Безопасность</string>
+    <string name="security_low">Низкая Безопасность</string>
+
+    <!-- Security Analysis Report -->
+    <string name="sec_report_high_intro">✅ Этот ключ очень надежен.\n\n</string>
+    <string name="sec_report_med_intro">⚠️ Хороший ключ, но может блокироваться строгими DPI.\n\n</string>
+    <string name="sec_report_low_intro">⛔ Ключ использует устаревшие методы шифрования или маскировки.\n\n</string>
+
+    <string name="sec_proto_vless">• Протокол: VLESS (Современный, быстрый).\n</string>
+    <string name="sec_flow_vision">• Flow: XTLS-Vision (Отличная защита от обнаружения).\n</string>
+    <string name="sec_security_reality">• Security: REALITY (Наивысшая степень маскировки под Google/Microsoft).\n</string>
+    <string name="sec_security_tls">• Security: TLS (Хорошее шифрование, как у HTTPS).\n</string>
+    <string name="sec_security_none">⚠ Security: None/Plain (Трафик не зашифрован или легко детектируется).\n</string>
+    <string name="sec_proto_vmess">• Протокол: VMess (Стандартный, но уязвим к активному зондированию).\n</string>
+    <string name="sec_obfu_tls">• Обфускация: TLS/WebSocket (Нормальная скрытность).\n</string>
+    <string name="sec_proto_ss2022">• Протокол: Shadowsocks 2022 (Улучшенный, защищен от replay атак).\n</string>
+    <string name="sec_proto_ss">• Протокол: Shadowsocks (Классический. Может блокироваться DPI).\n</string>
+    <string name="sec_proto_wg">• Протокол: WireGuard (Максимальная скорость и криптография. Но может блокироваться по протоколу UDP).\n</string>
+    <string name="sec_proto_outline">• Протокол: Outline (Устойчив к блокировкам, но не идеален).\n</string>
+    <string name="sec_proto_openvpn">• Протокол: OpenVPN (Надежный, но медленный).\n</string>
+    <string name="sec_proto_other">• Протокол: %1$s (Обычный).\n</string>
+
+    <string name="sec_port_443">• Порт: 443 (Маскируется под HTTPS трафик).\n</string>
+    <string name="sec_port_80">⚠ Порт: 80 (Обычный HTTP. Может быть подозрительно для VPN).\n</string>
+    <string name="sec_port_other">• Порт: %1$d (Нестандартный порт).\n</string>
+    
+    <!-- Themes -->
+    <string name="theme_carnelia">Carnelia VPN</string>
+    <string name="theme_cyberpunk">Киберпанк</string>
+    <string name="theme_matrix">Матрица</string>
+    <string name="theme_purple">Фиолетовая</string>
+    <string name="theme_light_blue">Голубая</string>
+    <string name="theme_light_green">Салатовая</string>
+    <string name="theme_light_pink">Розовая</string>
+    <string name="theme_light_purple">Светло-фиолетовая</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Темная</string>
+    <string name="theme_system">Системная</string>
+    <string name="theme_secret">Voks</string>
+    
+    <!-- Games -->
+    <string name="game_miner_title">Carnelia Miner</string>
+    <string name="game_miner_score">Баланс: %1$d TON</string>
+    <string name="game_miner_tap">НАЖМИ ЧТОБЫ МАЙНИТЬ</string>
+
+     <!-- Tunnel Settings -->
+    <string name="tunnel_settings_section">НАСТРОЙКИ ТУННЕЛЯ</string>
+    <string name="use_mux_title">Использовать Mux</string>
+    <string name="use_mux_summary">Объединять запросы в одно соединение (снижает latency).</string>
+    <string name="preferred_ip_title">Предпочтительный IP</string>
+    <string name="ip_type_auto">Авто</string>
+    <string name="ip_type_ipv4">IPv4</string>
+    <string name="ip_type_ipv6">IPv6</string>
+    <string name="allow_lan_title">Разрешить LAN</string>
+    <string name="allow_lan_summary">Доступ к локальной сети при включенном VPN.</string>
+    <string name="auto_start_title">Автозапуск</string>
+    <string name="auto_start_summary">Запускать при старте устройства.</string>
+    <string name="auto_start_summary_desc">Запускать Carnelia VPN при загрузке устройства.</string>
+
+    <!-- Donation & Theming -->
+    <string name="donation_section_title">Поддержка проекта</string>
+    <string name="donate_dev_title">Поддержать разработчика</string>
+    <string name="donate_dev_desc">Донат и Поддержка</string>
+    <string name="app_theme_title">Тема приложения</string>
+    <string name="donate_page_header">Поддержите Carnelia VPN</string>
+    <string name="donate_page_body">Приложение полностью бесплатно и без рекламы.\nСервера оплачиваются из моего кармана.\nЕсли вам нравится сервис, вы можете поддержать проект любой суммой.</string>
+    <string name="donate_ton_title">Криптовалюта TON</string>
+    <string name="address_copied_toast">Адрес скопирован!</string>
+    <string name="copy_address_btn">Скопировать адрес</string>
+
+    <!-- Tor Settings -->
+    <string name="tor_integration_title">Интеграция сети Tor</string>
+    <string name="tor_internal_title">Встроенный Tor</string>
+    <string name="tor_external_title">Внешнее приложение Orbot</string>
+    <string name="tor_internal_desc">Автономно. Выше расход батареи.</string>
+    <string name="tor_external_desc">Маршрутизация через Orbot. Требуется установка.</string>
 </resources>

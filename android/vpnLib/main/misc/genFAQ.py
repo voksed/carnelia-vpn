@@ -37,7 +37,7 @@ def genPage(javafile, lang):
         m = re.search("FAQEntry.*\((.*),(.*), R.string.([a-z0-9_]+),.*R.string.([a-z0-9_]+)\)", l)
         if m:
             if notmatched and notmatched.strip():
-                print "Line did not match: %s" % notmatched
+                print("Line did not match: %s" % notmatched)
                 
             notmatched = None
             (ver1, ver2, title, body) = m.groups()
@@ -169,7 +169,7 @@ def main():
     for directory in os.listdir("src/main/res"):
         if directory.startswith("values-") and directory.find("-sw")==-1 and not directory.startswith("values-v"):
             lang = directory.split("-",1)[1]
-            print lang
+            print(lang)
             loadstrres("src/ui/res/values-%s/strings.xml" % lang,lang)
 
             langdir= "%s/FAQ-%s" %(faqpath,lang)
@@ -178,7 +178,6 @@ def main():
             elif lang=="zh-rTW":
                 langdir= "%s/FAQ-%s" %(faqpath,"zh-Hant")
 
-                
             if not os.path.exists(langdir):
                 os.mkdir(langdir)
 
@@ -198,7 +197,7 @@ def checkFormatString(lang):
             int = tstr.find(f)==-1
 
             if ino != int:
-                print "Mismatch StringID(%s): " % lang,strid,"Original String:",ostr,"Translated String:",tstr
+                print("Mismatch StringID(%s): %s Original String: %s Translated String: %s" % (lang, strid, ostr, tstr))
                 
 if __name__=="__main__":
     main()

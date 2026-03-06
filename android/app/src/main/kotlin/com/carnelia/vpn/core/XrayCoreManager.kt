@@ -4,6 +4,8 @@ import android.content.Context
 import com.carnelia.vpn.utils.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -31,8 +33,36 @@ object XrayCoreManager {
             // Do NOT copy to filesDir (W^X violation leads to Permission Denied).
             val executablePath = executableFile.absolutePath
 
-            // 2. Generate Config
-            val configJson = buildConfig(config)
+            // 2. Validate Config (Security Check)
+            validateConfig(config)
+
+            // Check for assets
+            val geositeFile = File(context.filesDir, "geosite.dat")
+            val hasGeosite = geositeFile.exists()
+            if (!hasGeosite) {
+                AppLogger.log("WARNING: geosite.dat not found in ${context.filesDir}. Advanced domain blocking will be limited.")
+            }
+
+            // Check for geoip (for bypass)
+            val geoipFile = File(context.filesDir, "geoip.dat")
+            val hasGeoip = geoipFile.exists()
+
+            // Read Settings
+            val bypassRu = com.carnelia.vpn.utils.PrefsManager.isBypassRuEnabled(context)
+            val useMux = com.carnelia.vpn.utils.PrefsManager.isMuxEnabled(context)
+            val ipType = com.carnelia.vpn.utils.PrefsManager.getPreferredIpType(context)
+            val allowLan = com.carnelia.vpn.utils.PrefsManager.isAllowLanEnabled(context)
+            
+            // Fragmentation Settings
+            val fragEnabled = com.carnelia.vpn.utils.PrefsManager.isFragmentationEnabled(context)
+            val fragMode = com.carnelia.vpn.utils.PrefsManager.getFragmentationMode(context)
+
+            val muxTcp = com.carnelia.vpn.utils.PrefsManager.getMuxTcpConcurrency(context)
+            val muxUdp = com.carnelia.vpn.utils.PrefsManager.getMuxUdpConcurrency(context)
+            val muxQuic = com.carnelia.vpn.utils.PrefsManager.getMuxQuicMode(context)
+
+            // 3. Generate Config
+            val configJson = buildConfig(config, hasGeosite, hasGeoip, bypassRu, useMux, ipType, allowLan, fragEnabled, fragMode, muxTcp, muxUdp, muxQuic)
             val configFile = File(context.filesDir, "xray_config.json")
             configFile.writeText(configJson.toString())
 
@@ -42,22 +72,29 @@ object XrayCoreManager {
             
             val processBuilder = ProcessBuilder(command)
             processBuilder.directory(context.filesDir)
-            
-            // Redirect output to logcat or null to avoid buffer filling
-            // processBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT)
-            // processBuilder.redirectError(ProcessBuilder.Redirect.INHERIT)
-            
-            // Initialize config via env var if needed (XRAY_LOCATION_ASSET), 
-            // but file parameter is safer.
+            processBuilder.redirectErrorStream(true) // Merge stderr into stdout
             
             xrayProcess = processBuilder.start()
             
-            // Monitor startup (simple check)
-            if (!xrayProcess!!.isAlive) {
-                 val error = xrayProcess!!.inputStream.bufferedReader().readText()
-                 throw Exception("Xray exited immediately: $error")
+            // Consume output continuously (Stream Gobbler)
+            val stream = xrayProcess!!.inputStream
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    stream.bufferedReader().useLines { lines ->
+                        lines.forEach { AppLogger.log("Xray: $it") }
+                    }
+                } catch (e: Exception) { 
+                    AppLogger.log("Xray: Stream closed")
+                }
             }
-            
+
+            // Monitor startup
+            // Wait a moment for immediate crash (config error)
+             Thread.sleep(500)
+            if (!xrayProcess!!.isAlive) {
+                 throw Exception("Xray process died during startup. See logs for details.")
+            }
+
             AppLogger.log("XrayCoreManager: Started successfully on PID ${getTag()}")
 
         } catch (e: Exception) {
@@ -77,13 +114,42 @@ object XrayCoreManager {
          return "Active"
     }
 
-    private fun buildConfig(vpnConfig: VpnServerConfig): JSONObject {
+    private fun buildConfig(
+        vpnConfig: VpnServerConfig, 
+        hasGeosite: Boolean, 
+        hasGeoip: Boolean, 
+        bypassRu: Boolean, 
+        useMux: Boolean, 
+        ipType: String, 
+        allowLan: Boolean, 
+        fragEnabled: Boolean, 
+        fragMode: String,
+        muxTcp: Int,
+        muxUdp: Int,
+        muxQuic: String
+    ): JSONObject {
         val root = JSONObject()
         
         // Log
         val log = JSONObject()
         log.put("loglevel", "warning")
         root.put("log", log)
+
+        // DNS
+        val dns = JSONObject()
+        val servers = JSONArray()
+        
+        if (VpnGlobalState.isNetShieldEnabled) {
+             AppLogger.log("NetShield: Enabled. Using AdGuard DNS.")
+             servers.put("94.140.14.14") // AdGuard Default
+             servers.put("94.140.15.15")
+        } else {
+             servers.put("8.8.8.8")
+             servers.put("1.1.1.1")
+        }
+        
+        dns.put("servers", servers)
+        root.put("dns", dns)
 
         // Inbound (Local ShadowSocks listener for Tun2Socks)
         val inbounds = JSONArray()
@@ -99,7 +165,36 @@ object XrayCoreManager {
         settings.put("network", "tcp,udp")
         
         localInbound.put("settings", settings)
+
+        // Sniffing (Helps with routing and logging)
+        val sniffing = JSONObject()
+        val sniffs = JSONArray()
+        sniffs.put("http")
+        sniffs.put("tls")
+        sniffs.put("quic") // V2.0 Stealth: Sniff QUIC to handle it (or block it)
+        sniffing.put("enabled", true)
+        sniffing.put("destOverride", sniffs)
+        localInbound.put("sniffing", sniffing)
+
         inbounds.put(localInbound)
+
+        // Allow LAN Connections (Additional Inbound)
+        if (allowLan) {
+            val lanInbound = JSONObject()
+            lanInbound.put("tag", "lan_proxy")
+            lanInbound.put("port", 10809) // Different port for LAN
+            lanInbound.put("listen", "0.0.0.0") // Listen on all interfaces
+            lanInbound.put("protocol", "http") // Http proxy is easier for LAN sharing usually
+            // Or SOCKS
+             val lanSettings = JSONObject()
+             lanSettings.put("auth", "noauth")
+             lanSettings.put("udp", true)
+             lanInbound.put("settings", lanSettings)
+             
+            inbounds.put(lanInbound)
+            AppLogger.log("Allow LAN: Enabled on port 10809 (HTTP)")
+        }
+
         root.put("inbounds", inbounds)
 
         // Outbound (Real Server)
@@ -107,11 +202,79 @@ object XrayCoreManager {
         val realOutbound = JSONObject()
         realOutbound.put("tag", "proxy_out")
         
+        // Mux Settings
+        if (useMux) {
+            val mux = JSONObject()
+            mux.put("enabled", true)
+            mux.put("concurrency", muxTcp)
+            mux.put("xudpConcurrency", muxUdp)
+            mux.put("xudpProxyUDP443", muxQuic)
+            realOutbound.put("mux", mux)
+            AppLogger.log("Mux: Enabled (TCP: $muxTcp, UDP: $muxUdp, QUIC: $muxQuic)")
+        }
+        
+        // Preferred IP Strategy logic moved to routing section below
+        
+        // Helper to apply fragmentation to outbound
+        fun applySockOpt(outboundJson: JSONObject) {
+             val streamSettings = outboundJson.optJSONObject("streamSettings") ?: JSONObject()
+             val sockopt = JSONObject()
+             
+             if (fragEnabled) {
+                 val fragment = JSONObject()
+                 fragment.put("enabled", true)
+                 
+                 // Zapret-like presets
+                 when (fragMode) {
+                     "light" -> {
+                         // Minimal split, just ClientHello. 
+                         fragment.put("packets", "1-1") 
+                         fragment.put("length", "100-200") 
+                         fragment.put("interval", "10-20") 
+                     }
+                     "balanced" -> {
+                         // Standard bypass (like zapret --split-tls default)
+                         fragment.put("packets", "tlshello") // or "1-2"
+                         fragment.put("length", "100-200")
+                         fragment.put("interval", "10-30")
+                     }
+                     "aggressive" -> {
+                         // Heavy fragmentation for severe blocking
+                         fragment.put("packets", "1-5")
+                         fragment.put("length", "40-100") 
+                         fragment.put("interval", "50-100") 
+                     }
+                     else -> {
+                         fragment.put("packets", "tlshello")
+                         fragment.put("length", "100-200")
+                         fragment.put("interval", "10-20")
+                     }
+                 }
+                 sockopt.put("fragment", fragment)
+                 AppLogger.log("Fragmentation: Applied mode '$fragMode'")
+             }
+             
+             // TFO (TCP Fast Open) - always good to have if supported
+             sockopt.put("tcpKeepAliveInterval", 100)
+             
+             streamSettings.put("sockopt", sockopt)
+             outboundJson.put("streamSettings", streamSettings)
+        }
+
         when (vpnConfig.protocol) {
-            VpnProtocol.VLESS -> configureVless(realOutbound, vpnConfig)
-            VpnProtocol.VMESS -> configureVmess(realOutbound, vpnConfig)
-            VpnProtocol.TROJAN -> configureTrojan(realOutbound, vpnConfig)
-            VpnProtocol.SHADOWSOCKS, VpnProtocol.OUTLINE -> configureShadowsocks(realOutbound, vpnConfig)
+            VpnProtocol.VLESS -> {
+                configureVless(realOutbound, vpnConfig)
+                applySockOpt(realOutbound)
+            }
+            VpnProtocol.VMESS -> {
+                configureVmess(realOutbound, vpnConfig)
+                applySockOpt(realOutbound)
+            }
+            VpnProtocol.TROJAN -> {
+                configureTrojan(realOutbound, vpnConfig)
+                applySockOpt(realOutbound)
+            }
+            VpnProtocol.SHADOWSOCKS, VpnProtocol.OUTLINE -> configureShadowsocks(realOutbound, vpnConfig) // SS doesn't support fragment well usually
             VpnProtocol.WIREGUARD -> configureWireguard(realOutbound, vpnConfig)
             VpnProtocol.SOCKS -> configureSocks(realOutbound, vpnConfig)
             VpnProtocol.HTTP -> configureHttp(realOutbound, vpnConfig)
@@ -127,14 +290,115 @@ object XrayCoreManager {
         direct.put("settings", JSONObject())
         outbounds.put(direct)
 
+        // Block Outbound (For NetShield/Stealth)
+        val block = JSONObject()
+        block.put("tag", "blocked")
+        block.put("protocol", "blackhole")
+        block.put("settings", JSONObject())
+        outbounds.put(block)
+
         root.put("outbounds", outbounds)
         
-        // Routing (Simple)
+        // Routing
         val routing = JSONObject()
-        routing.put("domainStrategy", "AsIs")
+        
+        // Apply Preferred IP Strategy
+        when (ipType) {
+            "ipv4" -> routing.put("domainStrategy", "UseIPv4") 
+            "ipv6" -> routing.put("domainStrategy", "UseIPv6") 
+            else -> routing.put("domainStrategy", "IPIfNonMatch")
+        }
+
         val rules = JSONArray()
-        // Here we could add split tunneling rules from 'traffic control' settings?
-        // For now, route everything to proxy_out
+        
+        // 1. NetShield Blocking Rules (DNS + Routing)
+        if (VpnGlobalState.isNetShieldEnabled) {
+             AppLogger.log("NetShield: Active. Applying block rules.")
+             
+             // Block specific ad/tracker domains explicitly
+             val item = JSONObject()
+             item.put("type", "field")
+             item.put("outboundTag", "blocked")
+             val domains = JSONArray()
+             
+             if (hasGeosite) {
+                 domains.put("geosite:category-ads-all") // Standard Xray Geosite
+             } else {
+                 AppLogger.log("NetShield: Scaling back rules. geosite.dat missing.")
+             }
+
+             domains.put("domain:googleadservices.com")
+             domains.put("domain:doubleclick.net")
+             domains.put("domain:facebook.net")
+             domains.put("domain:analytics.google.com")
+             domains.put("domain:appsflyer.com")
+             domains.put("domain:adjust.com")
+             domains.put("domain:crashlytics.com")
+             domains.put("domain:adcolony.com")
+             domains.put("domain:unityads.unity3d.com")
+             item.put("domain", domains)
+             rules.put(item)
+        }
+        
+        if (VpnGlobalState.isStealthModeEnabled) {
+             AppLogger.log("StealthMode: Enabled. Blocking UDP/443 (QUIC).")
+             
+             // Rule: Block UDP port 443 (QUIC)
+             val blockQuic = JSONObject()
+             blockQuic.put("type", "field")
+             blockQuic.put("port", "443")
+             blockQuic.put("network", "udp")
+             blockQuic.put("outboundTag", "blocked")
+             rules.put(blockQuic)
+        }
+
+        // 2. Bypass LAN (Always Private IPs direct)
+        // Only if geoip.dat exists, otherwise Xray crashes trying to find "private"
+        if (hasGeoip) {
+            val privateRule = JSONObject()
+            privateRule.put("type", "field")
+            privateRule.put("outboundTag", "direct")
+            val privateIps = JSONArray()
+            privateIps.put("geoip:private")
+            privateRule.put("ip", privateIps)
+            rules.put(privateRule)
+        } else {
+             AppLogger.log("XrayConfig: geoip.dat missing, skipping LAN bypass rule.")
+        }
+
+
+        // 3. Smart Routing (Bypass RU)
+        if (bypassRu) {
+            AppLogger.log("SmartRouting: Bypass RU enabled.")
+            val bypassRule = JSONObject()
+            bypassRule.put("type", "field")
+            bypassRule.put("outboundTag", "direct")
+            
+            if (hasGeosite) {
+                 val domains = JSONArray()
+                 domains.put("geosite:ru")
+                 domains.put("geosite:yandex")
+                 domains.put("geosite:mailru")
+                 domains.put("geosite:vk") 
+                 domains.put("geosite:cn") 
+                 bypassRule.put("domain", domains)
+            } else {
+                 AppLogger.log("SmartRouting: Geosite missing, domain bypass skipped.")
+            }
+            
+            if (hasGeoip) {
+                 val ips = JSONArray()
+                 ips.put("geoip:ru")
+                 ips.put("geoip:cn")
+                 bypassRule.put("ip", ips)
+            } else {
+                 AppLogger.log("SmartRouting: Geoip missing, IP bypass skipped.")
+            }
+            
+            rules.put(bypassRule)
+        }
+
+        
         routing.put("rules", rules)
         root.put("routing", routing)
 
@@ -151,7 +415,13 @@ object XrayCoreManager {
         
         val users = JSONArray()
         val user = JSONObject()
-        user.put("id", config.config["id"] ?: config.password) // UUID
+        
+        val uuid = config.config["uuid"] ?: config.config["id"] ?: config.password
+        AppLogger.log("XrayConfig: Configuring VLESS with UUID: '$uuid'")
+        if (uuid.isNullOrEmpty()) {
+             throw Exception("VLESS requires a valid UUID, but got empty/null")
+        }
+        user.put("id", uuid) // UUID
         user.put("encryption", "none")
         user.put("flow", config.config["flow"] ?: "")
         users.put(user)
@@ -327,5 +597,35 @@ object XrayCoreManager {
         servers.put(server)
         settings.put("servers", servers)
         outbound.put("settings", settings)
+    }
+
+    private fun validateConfig(config: VpnServerConfig) {
+        // Basic Sanity Check (Always Run)
+        if (config.config.values.any { it.contains("your-public-key-placeholder") }) {
+            throw Exception("Config Error: 'your-public-key-placeholder' detected. Please replace it with your actual key.")
+        }
+
+        if (!VpnGlobalState.isSecureKeyCheckEnabled) return
+
+        AppLogger.log("SecurityCheck: Validating key integrity...")
+        
+        // Allow anomalous ports if security check is disabled or if user insists (Warn only)
+        if (config.port !in 1..65535) {
+             AppLogger.log("Security Check: Anomalous Port ${config.port} detected. Proceeding with caution.")
+             // throw Exception("Security Check: Invalid Port ${config.port}") // Disabled to allow anomalous ports
+        }
+        if (config.host.isEmpty()) throw Exception("Security Check: Host is empty")
+        
+        // Protocol specific validation
+        if (config.protocol == VpnProtocol.VLESS) {
+            val uuid = config.config["uuid"] ?: config.config["id"]
+            if (uuid == null || !uuid.matches(Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))) {
+                 throw Exception("Security Check: Invalid VLESS UUID format. Potential malicious config.")
+            }
+            if (config.config["security"] == "reality") {
+                 val pbk = config.config["pbk"] ?: config.config["publicKey"]
+                 if (pbk.isNullOrEmpty()) throw Exception("Security Check: Reality requires Public Key")
+            }
+        }
     }
 }

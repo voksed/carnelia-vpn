@@ -36,15 +36,25 @@ object OpenVpnHelper {
             profile.mName = config.name
 
             // Set Username and Password if available
-            if (!config.username.isNullOrEmpty()) {
-                profile.mUsername = config.username
+            var user = config.username
+            if (user.isNullOrEmpty()) {
+                user = config.config["username"]
             }
-            if (!config.password.isNullOrEmpty()) {
-                profile.mPassword = config.password
+            if (user.isNullOrEmpty()) {
+                user = "openvpn"
             }
+            profile.mUsername = user
+            
+            var pwd = config.password
+            if (pwd.isNullOrEmpty()) {
+                pwd = config.config["password"]
+            }
+            // Removed automatic fallback to "password" to allow UI prompt
+            // Trim password to avoid copy-paste errors
+            profile.mPassword = pwd?.trim()
 
             // Ensure Auth Type includes User/Pass if credentials are provided
-            if (!config.username.isNullOrEmpty() || !config.password.isNullOrEmpty()) {
+            if (!user.isNullOrEmpty() || !pwd.isNullOrEmpty()) {
                 when (profile.mAuthenticationType) {
                     VpnProfile.TYPE_CERTIFICATES -> profile.mAuthenticationType = VpnProfile.TYPE_USERPASS_CERTIFICATES
                     VpnProfile.TYPE_PKCS12 -> profile.mAuthenticationType = VpnProfile.TYPE_USERPASS_PKCS12

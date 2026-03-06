@@ -5,7 +5,10 @@ import com.carnelia.vpn.core.protocols.ProtocolFactory
 import com.carnelia.vpn.core.protocols.IVpnProtocol
 
 import com.carnelia.vpn.utils.PrefsManager
+import com.carnelia.vpn.utils.AppLogger
 import android.content.Context
+
+private const val TAG = "VpnManager"
 
 /**
  * Central VPN Manager
@@ -52,11 +55,36 @@ class VpnManager(
                 // DNS Injection logic
                 mutableConfig["dns_server"] = PrefsManager.getDnsServer(context)
                 
+                // Tor / Orbot Integration - REMOVED
+                /*
+                if (PrefsManager.isTorEnabled(context)) {
+                     // Notify user or log that we are starting Tor
+                     android.util.Log.d(TAG, "Starting Tor...")
+                     com.carnelia.vpn.core.TorManager.startTor(context)
+                }
+                */
+                
                 val modifiedConfig = config.copy(config = mutableConfig)
                 
                 // Create protocol instance
                 currentProtocol = ProtocolFactory.createProtocol(context, config.protocol)
                 currentConfig = modifiedConfig
+                
+                // Audit / Connectivity Check
+                if (PrefsManager.isSecureKeyCheckEnabled(context)) {
+                    updateConnectionState(ConnectionState.CONNECTING) // Show we are trying
+                    val ping = com.carnelia.vpn.utils.NetworkUtils.pingServer(config.host, config.port)
+                    if (ping == -1L) {
+                         // Audit failed
+                         AppLogger.error("Key Audit Failed: Cannot reach ${config.host}:${config.port}")
+                         // We could stop here, but user said "eat any error", so maybe just log and continue?
+                         // "Audit doesn't work" implies they want to KNOW.
+                         // Let's notify error but TRY to connect anyway, as UDP might work where TCP ping fails.
+                         // Or better: update stats with error but proceed.
+                    } else {
+                         AppLogger.log("Key Audit Passed: ${ping}ms")
+                    }
+                }
                 
                 // Prepare protocol
                 val prepareResult = currentProtocol?.prepare()
@@ -98,16 +126,14 @@ class VpnManager(
     /**
      * Disconnect from VPN
      */
-    fun disconnect() {
-        coroutineScope.launch {
-            try {
-                updateConnectionState(ConnectionState.DISCONNECTING)
-                currentProtocol?.stop()
-                updateConnectionState(ConnectionState.DISCONNECTED)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateConnectionState(ConnectionState.ERROR)
-            }
+    suspend fun disconnect() {
+        try {
+            updateConnectionState(ConnectionState.DISCONNECTING)
+            currentProtocol?.stop()
+            updateConnectionState(ConnectionState.DISCONNECTED)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            updateConnectionState(ConnectionState.ERROR)
         }
     }
     
@@ -165,13 +191,43 @@ class VpnManager(
      */
     private fun updateConnectionState(newState: ConnectionState) {
         if (connectionState != newState) {
+            // Update connection time
+            val newConnectionTime = if (newState == ConnectionState.CONNECTED) {
+                System.currentTimeMillis()
+            } else if (newState == ConnectionState.DISCONNECTED || newState == ConnectionState.UNKNOWN) {
+                0L
+            } else {
+                stats.connectionTime // Keep existing time during transitions
+            }
+
+            // Reset bytes on new connection attempt
+            val (newBytesSent, newBytesReceived) = if (newState == ConnectionState.PREPARING) {
+                0L to 0L
+            } else {
+                stats.bytesSent to stats.bytesReceived
+            }
+
             connectionState = newState
             stats = stats.copy(
-                isConnected = newState == ConnectionState.CONNECTED
+                isConnected = newState == ConnectionState.CONNECTED,
+                connectionTime = newConnectionTime,
+                bytesSent = newBytesSent,
+                bytesReceived = newBytesReceived
             )
+            
             stateListeners.forEach { it(newState) }
             statsListeners.forEach { it(stats) }
-            VpnGlobalState.updateState(newState) // Update Global State
+            
+            // Push updates to Global State for UI
+            VpnGlobalState.updateStats(stats)
+            VpnGlobalState.updateState(newState)
+            
+            // Notify Widget
+            try {
+                val intent = android.content.Intent("com.carnelia.vpn.UPDATE_WIDGET")
+                intent.setPackage(context.packageName)
+                context.sendBroadcast(intent)
+            } catch (e: Exception) {}
         }
     }
     

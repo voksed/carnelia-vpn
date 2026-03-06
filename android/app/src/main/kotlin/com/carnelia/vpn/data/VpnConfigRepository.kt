@@ -2,6 +2,8 @@ package com.carnelia.vpn.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import com.carnelia.vpn.core.VpnServerConfig
@@ -12,6 +14,9 @@ import com.carnelia.vpn.core.VpnProtocol
  * Stores and manages saved VPN servers
  */
 class VpnConfigRepository(private val dataStore: DataStore<Preferences>) {
+    
+    private val gson = Gson()
+    private val serverListType = object : TypeToken<List<VpnServerConfig>>() {}.type
     
     companion object {
         private val SERVERS_KEY = stringPreferencesKey("vpn_servers")
@@ -97,12 +102,14 @@ class VpnConfigRepository(private val dataStore: DataStore<Preferences>) {
     // Private helpers
     
     private fun parseServersJson(json: String): List<VpnServerConfig> {
-        // In production: use proper JSON library (Gson, kotlinx.serialization)
-        return emptyList() // Placeholder
+        return try {
+            gson.fromJson(json, serverListType)
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
     
     private fun serversToJson(servers: List<VpnServerConfig>): String {
-        // In production: use proper JSON library
-        return "[]" // Placeholder
+        return gson.toJson(servers)
     }
 }

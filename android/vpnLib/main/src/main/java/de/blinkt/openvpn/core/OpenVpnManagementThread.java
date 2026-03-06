@@ -668,6 +668,7 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
         // or  ">PASSWORD:Verification Failed: '%s' ['%s']"
         String needed;
 
+        android.util.Log.e("OpenVPN_DEBUG", "processPWCommand: " + argument);
 
         try {
             // Ignore Auth token message, already managed by openvpn itself
@@ -697,7 +698,12 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
             case "Auth":
                 pw = mProfile.getPasswordAuth();
                 username = mProfile.mUsername;
-
+                android.util.Log.e("OpenVPN_DEBUG", "Needed: Auth. Username: " + username + ", PW found: " + (pw != null ? "'" + pw + "'" : "null"));
+                if (pw != null) {
+                    VpnStatus.logDebug("Found password in cache/profile for user: " + username);
+                } else {
+                    VpnStatus.logDebug("No password found in cache/profile for user: " + username);
+                }
                 break;
             case "HTTP Proxy":
                 if (mCurrentProxyConnection != null) {
