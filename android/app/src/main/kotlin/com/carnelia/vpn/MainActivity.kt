@@ -210,7 +210,12 @@ fun CarheliaApp(
     LaunchedEffect(showServerList) {
         if (!showServerList) {
              val current = repository.getLastUsedServer()
-             if (current != null) activeConfig = current
+             if (current != null) {
+                 activeConfig = current
+             } else {
+                 // Active server might have been deleted, fallback to first available
+                 activeConfig = repository.getServers().firstOrNull()
+             }
         }
     }
     
@@ -583,7 +588,7 @@ fun ServerSelectionDialog(
     currentTheme: AppTheme,
     activeInfo: VpnServerConfig?
 ) {
-    val servers = remember { repository.getServers() }
+    var servers by remember { mutableStateOf(repository.getServers()) }
     var showManualAdd by remember { mutableStateOf(false) }
 
     if (showManualAdd) {
@@ -592,6 +597,7 @@ fun ServerSelectionDialog(
             onSave = { config ->
                 repository.addServer(config)
                 onServerSelected(config)
+                servers = repository.getServers()
                 showManualAdd = false
             }
         )
@@ -662,15 +668,36 @@ fun ServerSelectionDialog(
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                 Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                     Column(modifier = Modifier.weight(1f)) {
-                                         Text(server.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                         Text(server.host, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
-                                     }
-                                     if (isSelected) {
-                                         Icon(Icons.Default.Check, null, tint = Color.White)
-                                     }
-                                 }
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(server.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text(server.host, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                                    }
+
+                                    // Delete Button
+                                    IconButton(
+                                        onClick = { 
+                                            repository.removeServer(server.id)
+                                            servers = repository.getServers()
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Delete, 
+                                            contentDescription = "Delete", 
+                                            tint = Color.Gray.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    if (isSelected) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(Icons.Default.Check, null, tint = Color.White)
+                                    }
+                                }
                             }
                         }
                         if (servers.isEmpty()) {
