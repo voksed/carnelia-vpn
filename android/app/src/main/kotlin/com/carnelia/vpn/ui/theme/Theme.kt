@@ -13,6 +13,7 @@ import androidx.core.view.WindowCompat
 import android.app.Activity
 import com.carnelia.vpn.utils.PrefsManager
 import com.carnelia.vpn.R
+import androidx.compose.runtime.remember
 
 enum class AppTheme(val displayNameResId: Int, val colorScheme: androidx.compose.material3.ColorScheme, val isDark: Boolean = true) {
     CARNELIA(R.string.theme_carnelia, darkColorScheme(
@@ -348,32 +349,49 @@ fun CarheliaTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val currentThemeIndex = themeIndex ?: PrefsManager.getThemeIndex(context)
-    val isSecretUnlocked = PrefsManager.isSecretThemeUnlocked(context)
+    val isSecretUnlocked = remember { PrefsManager.isSecretThemeUnlocked(context) }
     val isSystemInDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
     
-    val theme = when {
-        isSecretUnlocked && currentThemeIndex == 12 -> AppTheme.SECRET
-        currentThemeIndex == 11 -> if (isSystemInDarkTheme) AppTheme.DARK else AppTheme.LIGHT // SYSTEM
-        else -> AppTheme.values().getOrElse(currentThemeIndex) { AppTheme.CARNELIA }
+    // If themeIndex is provided, use it. Otherwise read from Prefs.
+    // However, if themeIndex is passed as a parameter, it might be outdated if we don't observe Prefs?
+    // Actually, the caller (MainActivity/SettingsActivity) is responsible for observing and passing the correct index.
+    
+    val currentThemeIndex = themeIndex ?: PrefsManager.getThemeIndex(context)
+
+    // Ensure we handle valid indices
+    val theme = remember(currentThemeIndex, isSystemInDarkTheme) {
+        when {
+            isSecretUnlocked && currentThemeIndex == 12 -> AppTheme.SECRET.colorScheme
+            currentThemeIndex == 11 -> if (isSystemInDarkTheme) AppTheme.DARK.colorScheme else AppTheme.LIGHT.colorScheme
+            currentThemeIndex >= 0 && currentThemeIndex < AppTheme.values().size -> AppTheme.values()[currentThemeIndex].colorScheme
+            else -> AppTheme.CARNELIA.colorScheme
+        }
+    }
+    
+    val isDark = remember(currentThemeIndex, isSystemInDarkTheme) {
+        when {
+            isSecretUnlocked && currentThemeIndex == 12 -> AppTheme.SECRET.isDark
+            currentThemeIndex == 11 -> isSystemInDarkTheme
+            currentThemeIndex >= 0 && currentThemeIndex < AppTheme.values().size -> AppTheme.values()[currentThemeIndex].isDark
+            else -> AppTheme.CARNELIA.isDark
+        }
     }
 
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = theme.colorScheme.background.toArgb()
-            window.navigationBarColor = theme.colorScheme.background.toArgb()
+            window.statusBarColor = theme.background.toArgb()
+            window.navigationBarColor = theme.background.toArgb()
             
             val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.isAppearanceLightStatusBars = !theme.isDark
-            insetsController.isAppearanceLightNavigationBars = !theme.isDark
+            insetsController.isAppearanceLightStatusBars = !isDark
+            insetsController.isAppearanceLightNavigationBars = !isDark
         }
     }
 
     MaterialTheme(
-        colorScheme = theme.colorScheme,
-        typography = Typography,
+        colorScheme = theme,
         content = content
     )
 }

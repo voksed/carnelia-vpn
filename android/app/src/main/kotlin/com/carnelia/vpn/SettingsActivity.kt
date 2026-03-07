@@ -90,6 +90,7 @@ enum class SettingsPage {
     CONNECTION,
     CENSORSHIP_BYPASS,
     AUTO_CONNECT,
+    TUNNEL,
     LANGUAGE,
     DONATION
 }
@@ -120,9 +121,10 @@ fun SettingsScreen() {
                                 SettingsPage.CONNECTION -> stringResource(R.string.connection_section)
                                 SettingsPage.CENSORSHIP_BYPASS -> stringResource(R.string.bypass_advanced_section)
                                 SettingsPage.AUTO_CONNECT -> stringResource(R.string.smart_auto_connect_title)
+                                SettingsPage.TUNNEL -> stringResource(R.string.tunnel_settings_section)
                                 SettingsPage.LANGUAGE -> stringResource(R.string.language_title)
                                 SettingsPage.DONATION -> stringResource(R.string.donation_section_title)
-                            }, 
+                            },  
                             color = MaterialTheme.colorScheme.onSurface
                         ) 
                     },
@@ -165,6 +167,7 @@ fun SettingsScreen() {
                     SettingsPage.CONNECTION -> ConnectionSettings(context)
                     SettingsPage.CENSORSHIP_BYPASS -> CensorshipBypassSettings(context)
                     SettingsPage.AUTO_CONNECT -> AutoConnectSettings(context)
+                    SettingsPage.TUNNEL -> TunnelSettings(context)
                     SettingsPage.LANGUAGE -> LanguageSettings(context) { currentScreen = SettingsPage.MAIN }
                     SettingsPage.DONATION -> DonationSettings(context)
                 }
@@ -186,133 +189,18 @@ fun MainSettingsMenu(
             .verticalScroll(rememberScrollState())
     ) {
         
-        // --- Tunnel Settings (New) ---
-        Text(
-            text = stringResource(R.string.tunnel_settings_section),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-        )
-        
-        // Use Mux
-        var muxEnabled by remember { mutableStateOf(PrefsManager.isMuxEnabled(context)) }
-        var muxTcp by remember { mutableStateOf(PrefsManager.getMuxTcpConcurrency(context)) }
-        var muxUdp by remember { mutableStateOf(PrefsManager.getMuxUdpConcurrency(context)) }
-        var muxQuic by remember { mutableStateOf(PrefsManager.getMuxQuicMode(context)) }
-        
-        SettingsCategoryItem(
-            icon = Icons.Default.Merge,
-            title = stringResource(R.string.use_mux_title),
-            value = if (muxEnabled) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status),
-            onClick = { 
-                muxEnabled = !muxEnabled
-                PrefsManager.setMuxEnabled(context, muxEnabled)
-            }
-        )
-        
-        AnimatedVisibility(
-            visible = muxEnabled,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            Column(modifier = Modifier.padding(start = 16.dp)) {
-                
-                NumberPickerItem(
-                    title = stringResource(R.string.mux_tcp_concurrency),
-                    value = muxTcp,
-                    range = -1..1024,
-                    onValueChange = { 
-                        muxTcp = it
-                        PrefsManager.setMuxTcpConcurrency(context, it)
-                    }
-                )
-
-                NumberPickerItem(
-                    title = stringResource(R.string.mux_udp_concurrency),
-                    value = muxUdp,
-                    range = -1..1024,
-                    onValueChange = { 
-                        muxUdp = it
-                        PrefsManager.setMuxUdpConcurrency(context, it)
-                    }
-                )
-
-                val quicOptions = listOf(
-                    stringResource(R.string.quic_mode_reject) to "reject",
-                    stringResource(R.string.quic_mode_allow) to "allow"
-                )
-                val selectedQuicIdx = quicOptions.indexOfFirst { it.second == muxQuic }.coerceAtLeast(0)
-                
-                DropdownSettingItem(
-                     title = stringResource(R.string.mux_quic_mode),
-                     options = quicOptions,
-                     selectedOptionIdx = selectedQuicIdx,
-                     onOptionSelected = { idx ->
-                         val newValue = quicOptions[idx].second
-                         muxQuic = newValue
-                         PrefsManager.setMuxQuicMode(context, newValue)
-                     }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
-
-        // Preferred IP
-        var ipType by remember { mutableStateOf(PrefsManager.getPreferredIpType(context)) }
-        SettingsCategoryItem(
-            icon = Icons.Default.Dns,
-            title = stringResource(R.string.preferred_ip_title),
-            value = when(ipType) {
-                "ipv4" -> stringResource(R.string.ip_type_ipv4)
-                "ipv6" -> stringResource(R.string.ip_type_ipv6)
-                else -> stringResource(R.string.ip_type_auto)
-            },
-            onClick = {
-                // Cycle: auto -> ipv4 -> ipv6
-                val newType = when(ipType) {
-                    "auto" -> "ipv4"
-                    "ipv4" -> "ipv6"
-                    else -> "auto"
-                }
-                ipType = newType
-                PrefsManager.setPreferredIpType(context, newType)
-            }
-        )
-        
-        // Allow LAN
-        var lanEnabled by remember { mutableStateOf(PrefsManager.isAllowLanEnabled(context)) }
-        SettingsCategoryItem(
-            icon = Icons.Default.Lan,
-            title = stringResource(R.string.allow_lan_title),
-            description = stringResource(R.string.allow_lan_summary),
-            value = if (lanEnabled) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status),
-            onClick = { 
-                lanEnabled = !lanEnabled
-                PrefsManager.setAllowLanEnabled(context, lanEnabled)
-            }
-        )
-        
-        // Auto Start
-        var autoStart by remember { mutableStateOf(PrefsManager.isAppAutoStartEnabled(context)) }
-        SettingsCategoryItem(
-            icon = Icons.Default.RocketLaunch,
-            title = stringResource(R.string.auto_start_title),
-            value = if (autoStart) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status),
-            onClick = {
-                autoStart = !autoStart
-                PrefsManager.setAppAutoStartEnabled(context, autoStart)
-            }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(color = Color(0xFF2C2C2C))
-        Spacer(modifier = Modifier.height(16.dp))
-
         // --- Categories ---
         SettingsCategoryItem(
             icon = Icons.Default.Palette,
             title = stringResource(R.string.appearance_section),
             onClick = { onNavigate(SettingsPage.APPEARANCE) }
+        )
+
+        SettingsCategoryItem(
+            icon = Icons.Default.Tune,
+            title = stringResource(R.string.tunnel_settings_section),
+            description = "Mux, IP Strategy, LAN, Auto Start",
+            onClick = { onNavigate(SettingsPage.TUNNEL) }
         )
         
         SettingsCategoryItem(
@@ -507,6 +395,140 @@ fun SettingsCategoryItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+fun TunnelSettings(context: Context) {
+    Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+        
+        Text(
+            text = "Mux & Protocols",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        
+        // Use Mux
+        var muxEnabled by remember { mutableStateOf(PrefsManager.isMuxEnabled(context)) }
+        var muxTcp by remember { mutableStateOf(PrefsManager.getMuxTcpConcurrency(context)) }
+        var muxUdp by remember { mutableStateOf(PrefsManager.getMuxUdpConcurrency(context)) }
+        var muxQuic by remember { mutableStateOf(PrefsManager.getMuxQuicMode(context)) }
+        
+        SettingsCategoryItem(
+            icon = Icons.Default.Merge,
+            title = stringResource(R.string.use_mux_title),
+            value = if (muxEnabled) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status),
+            onClick = { 
+                muxEnabled = !muxEnabled
+                PrefsManager.setMuxEnabled(context, muxEnabled)
+            }
+        )
+        
+        AnimatedVisibility(
+            visible = muxEnabled,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(modifier = Modifier.padding(start = 16.dp)) {
+                
+                NumberPickerItem(
+                    title = stringResource(R.string.mux_tcp_concurrency),
+                    value = muxTcp,
+                    range = -1..1024,
+                    onValueChange = { 
+                        muxTcp = it
+                        PrefsManager.setMuxTcpConcurrency(context, it)
+                    }
+                )
+
+                NumberPickerItem(
+                    title = stringResource(R.string.mux_udp_concurrency),
+                    value = muxUdp,
+                    range = -1..1024,
+                    onValueChange = { 
+                        muxUdp = it
+                        PrefsManager.setMuxUdpConcurrency(context, it)
+                    }
+                )
+
+                val quicOptions = listOf(
+                    stringResource(R.string.quic_mode_reject) to "reject",
+                    stringResource(R.string.quic_mode_allow) to "allow"
+                )
+                val selectedQuicIdx = quicOptions.indexOfFirst { it.second == muxQuic }.coerceAtLeast(0)
+                
+                DropdownSettingItem(
+                     title = stringResource(R.string.mux_quic_mode),
+                     options = quicOptions,
+                     selectedOptionIdx = selectedQuicIdx,
+                     onOptionSelected = { idx ->
+                         val newValue = quicOptions[idx].second
+                         muxQuic = newValue
+                         PrefsManager.setMuxQuicMode(context, newValue)
+                     }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = Color(0xFF2C2C2C))
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Connectivity",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // Preferred IP
+        var ipType by remember { mutableStateOf(PrefsManager.getPreferredIpType(context)) }
+        SettingsCategoryItem(
+            icon = Icons.Default.Dns,
+            title = stringResource(R.string.preferred_ip_title),
+            value = when(ipType) {
+                "ipv4" -> stringResource(R.string.ip_type_ipv4)
+                "ipv6" -> stringResource(R.string.ip_type_ipv6)
+                else -> stringResource(R.string.ip_type_auto)
+            },
+            onClick = {
+                // Cycle: auto -> ipv4 -> ipv6
+                val newType = when(ipType) {
+                    "auto" -> "ipv4"
+                    "ipv4" -> "ipv6"
+                    else -> "auto"
+                }
+                ipType = newType
+                PrefsManager.setPreferredIpType(context, newType)
+            }
+        )
+        
+        // Allow LAN
+        var lanEnabled by remember { mutableStateOf(PrefsManager.isAllowLanEnabled(context)) }
+        SettingsCategoryItem(
+            icon = Icons.Default.Lan,
+            title = stringResource(R.string.allow_lan_title),
+            description = stringResource(R.string.allow_lan_summary),
+            value = if (lanEnabled) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status),
+            onClick = { 
+                lanEnabled = !lanEnabled
+                PrefsManager.setAllowLanEnabled(context, lanEnabled)
+            }
+        )
+        
+        // Auto Start
+        var autoStart by remember { mutableStateOf(PrefsManager.isAppAutoStartEnabled(context)) }
+        SettingsCategoryItem(
+            icon = Icons.Default.RocketLaunch,
+            title = stringResource(R.string.auto_start_title),
+            value = if (autoStart) stringResource(R.string.enabled_status) else stringResource(R.string.disabled_status),
+            onClick = {
+                autoStart = !autoStart
+                PrefsManager.setAppAutoStartEnabled(context, autoStart)
+            }
+        )
     }
 }
 
