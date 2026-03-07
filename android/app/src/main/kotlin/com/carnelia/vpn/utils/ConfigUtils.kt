@@ -172,7 +172,13 @@ object ConfigParser {
                     error("SS: Port missing", "SS: Не указан порт")
                 }
             } else {
-                val hp = hostPart.split(":")
+                // Remove parameters /?# if present
+                val cleanHostPart = if (hostPart.contains("/")) hostPart.substringBefore("/") 
+                                    else if (hostPart.contains("?")) hostPart.substringBefore("?")
+                                    else if (hostPart.contains("#")) hostPart.substringBefore("#")
+                                    else hostPart
+
+                val hp = cleanHostPart.split(":")
                 if (hp.size != 2) error("SS: Invalid Host:Port", "SS: Неверный формат Хост:Порт")
                 hostStr = hp[0]
                 portStr = hp[1]
