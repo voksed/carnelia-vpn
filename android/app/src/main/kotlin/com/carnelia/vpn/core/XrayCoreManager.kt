@@ -63,6 +63,9 @@ object XrayCoreManager {
 
             // 3. Generate Config
             val configJson = buildConfig(config, hasGeosite, hasGeoip, bypassRu, useMux, ipType, allowLan, fragEnabled, fragMode, muxTcp, muxUdp, muxQuic)
+            
+            AppLogger.log("Xray Config: $configJson")
+            
             val configFile = File(context.filesDir, "xray_config.json")
             configFile.writeText(configJson.toString())
 
@@ -206,11 +209,16 @@ object XrayCoreManager {
         if (useMux) {
             val mux = JSONObject()
             mux.put("enabled", true)
-            mux.put("concurrency", muxTcp)
-            mux.put("xudpConcurrency", muxUdp)
-            mux.put("xudpProxyUDP443", muxQuic)
+            mux.put("concurrency", muxTcp) // Standard Mux concurrency
+            
+            // These fields require newer Xray core (1.8.0+). 
+            // Commenting out temporarily to prevent crashes on older cores.
+            // mux.put("xudpConcurrency", muxUdp)
+            // mux.put("xudpProxyUDP443", muxQuic)
+            
             realOutbound.put("mux", mux)
-            AppLogger.log("Mux: Enabled (TCP: $muxTcp, UDP: $muxUdp, QUIC: $muxQuic)")
+            AppLogger.log("Mux: Enabled (TCP: $muxTcp)") 
+            // AppLogger.log("Mux: Enabled (TCP: $muxTcp, UDP: $muxUdp, QUIC: $muxQuic)")
         }
         
         // Preferred IP Strategy logic moved to routing section below
