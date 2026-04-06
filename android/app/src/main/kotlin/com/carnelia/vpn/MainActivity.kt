@@ -64,6 +64,7 @@ import com.google.zxing.BarcodeFormat
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.foundation.Image
 import android.content.ClipboardManager
 import android.content.Context
@@ -124,7 +125,8 @@ class MainActivity : ComponentActivity() {
                 CarheliaApp(
                     vpnManager, 
                     ::startVpn, 
-                    ::stopVpn, 
+                    ::stopVpn,
+                    ::switchVpn,
                     currentTheme, 
                     onScanQr = { 
                         val options = ScanOptions()
@@ -176,6 +178,18 @@ class MainActivity : ComponentActivity() {
         startService(intent)
     }
 
+    private fun switchVpn(config: VpnServerConfig) {
+        try {
+            val serviceIntent = Intent(this, CarheliaVpnService::class.java).apply {
+                action = CarheliaVpnService.ACTION_RECONNECT
+                putExtra(CarheliaVpnService.EXTRA_CONFIG, config)
+            }
+            startService(serviceIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error: " + e.message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         vpnManager.destroy()
@@ -188,6 +202,7 @@ fun CarheliaApp(
     vpnManager: VpnManager,
     onConnect: (VpnServerConfig) -> Unit,
     onDisconnect: () -> Unit,
+    onSwitch: (VpnServerConfig) -> Unit,
     currentTheme: AppTheme,
     onScanQr: () -> Unit,
     onImportClipboard: () -> Unit
@@ -235,6 +250,11 @@ fun CarheliaApp(
                 activeConfig = server
                 repository.setLastUsedServer(server)
                 showServerList = false
+                // If VPN is active, hot-switch without dropping the tunnel
+                if (connectionState == ConnectionState.CONNECTED ||
+                    connectionState == ConnectionState.RECONNECTING) {
+                    onSwitch(server)
+                }
             },
             onDismiss = { showServerList = false },
             onImportClipboard = {
@@ -250,9 +270,6 @@ fun CarheliaApp(
             activeInfo = activeConfig
         )
     }
-
-    // Toggle State for Tor
-    var isTorEnabled by remember { mutableStateOf(PrefsManager.isTorEnabled(context)) }
 
     // Connection Duration Timer
     var connectionDuration by remember { mutableStateOf("00:00:00") }
@@ -286,26 +303,6 @@ fun CarheliaApp(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = Color(0xFF333333))
                 Spacer(Modifier.height(16.dp))
                 
-                // Browser
-                NavigationDrawerItem(
-                    label = { Text(stringResource(R.string.private_browser_title)) },
-                    selected = false,
-                    onClick = {
-                        try {
-                            context.startActivity(Intent(context, PrivateBrowserActivity::class.java))
-                        } catch (e: Exception) {
-                            Toast.makeText(context, context.getString(R.string.browser_opening), Toast.LENGTH_SHORT).show()
-                        }
-                        scope.launch { drawerState.close() }
-                    },
-                    icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White) },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    colors = NavigationDrawerItemDefaults.colors(
-                        unselectedContainerColor = Color.Transparent,
-                        unselectedTextColor = Color.White
-                    )
-                )
-                
                 // Settings
                 NavigationDrawerItem(
                     label = { Text(stringResource(R.string.settings_title_menu)) },
@@ -315,6 +312,22 @@ fun CarheliaApp(
                         scope.launch { drawerState.close() }
                     },
                     icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedContainerColor = Color.Transparent,
+                        unselectedTextColor = Color.White
+                    )
+                )
+
+                // Geolocation Spoofing
+                NavigationDrawerItem(
+                    label = { Text(stringResource(R.string.geo_spoof_title)) },
+                    selected = false,
+                    onClick = {
+                        context.startActivity(Intent(context, GeoSpoofActivity::class.java))
+                        scope.launch { drawerState.close() }
+                    },
+                    icon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.White) },
                     modifier = Modifier.padding(horizontal = 12.dp),
                     colors = NavigationDrawerItemDefaults.colors(
                         unselectedContainerColor = Color.Transparent,
@@ -390,12 +403,14 @@ fun CarheliaApp(
                         text = when (connectionState) {
                             ConnectionState.CONNECTED -> stringResource(R.string.status_secured)
                             ConnectionState.CONNECTING -> stringResource(R.string.status_connecting)
+                            ConnectionState.RECONNECTING -> stringResource(R.string.status_switching)
                             else -> stringResource(R.string.status_not_protected)
                         },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = when (connectionState) {
                             ConnectionState.CONNECTED -> Color(0xFF00FF00)
+                            ConnectionState.RECONNECTING -> Color(0xFFFFAA00)
                             ConnectionState.ERROR -> Color(0xFFFF1744)
                             else -> Color.Gray
                         },
@@ -430,16 +445,6 @@ fun CarheliaApp(
                                     val server = activeConfig ?: repository.getServers().firstOrNull()
                                     if (server != null) {
                                         onConnect(server)
-                                    } else if (isTorEnabled) {
-                                        val torConfig = VpnServerConfig(
-                                            id = "tor_standalone",
-                                            name = "Tor Network",
-                                            protocol = com.carnelia.vpn.core.VpnProtocol.SOCKS,
-                                            host = "127.0.0.1",
-                                            port = 9050,
-                                            config = mapOf("tor_mode" to "true")
-                                        )
-                                        onConnect(torConfig)
                                     } else {
                                         showServerList = true
                                     }

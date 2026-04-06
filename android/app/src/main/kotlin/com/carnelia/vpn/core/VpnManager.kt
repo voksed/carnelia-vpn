@@ -38,37 +38,9 @@ class VpnManager(
             try {
                 updateConnectionState(ConnectionState.PREPARING)
                 
-                // Inject Bypass RU setting
-                val mutableConfig = config.config.toMutableMap()
-                
-                // Feature Injection
-                if (PrefsManager.isBypassRuEnabled(context)) {
-                    mutableConfig["bypass_ru"] = "true"
-                }
-                if (PrefsManager.isFragmentationEnabled(context)) {
-                    mutableConfig["frag_enabled"] = "true"
-                    mutableConfig["frag_packets"] = PrefsManager.getFragmentPackets(context)
-                    mutableConfig["frag_length"] = PrefsManager.getFragmentLength(context)
-                    mutableConfig["frag_interval"] = PrefsManager.getFragmentInterval(context)
-                }
-                
-                // DNS Injection logic
-                mutableConfig["dns_server"] = PrefsManager.getDnsServer(context)
-                
-                // Tor / Orbot Integration - REMOVED
-                /*
-                if (PrefsManager.isTorEnabled(context)) {
-                     // Notify user or log that we are starting Tor
-                     android.util.Log.d(TAG, "Starting Tor...")
-                     com.carnelia.vpn.core.TorManager.startTor(context)
-                }
-                */
-                
-                val modifiedConfig = config.copy(config = mutableConfig)
-                
                 // Create protocol instance
                 currentProtocol = ProtocolFactory.createProtocol(context, config.protocol)
-                currentConfig = modifiedConfig
+                currentConfig = config
                 
                 // Audit / Connectivity Check
                 if (PrefsManager.isSecureKeyCheckEnabled(context)) {
@@ -98,7 +70,7 @@ class VpnManager(
                 setupProtocolListeners()
                 
                 // Start connection
-                val startResult = currentProtocol?.start(modifiedConfig)
+                val startResult = currentProtocol?.start(config)
                 if (startResult != VpnErrorCode.NO_ERROR) {
                     notifyError("Start failed: ${startResult?.name}")
                     updateConnectionState(ConnectionState.ERROR)
@@ -121,6 +93,25 @@ class VpnManager(
      */
     fun onInterfaceEstablished(pfd: android.os.ParcelFileDescriptor) {
         currentProtocol?.onNetworkInterfaceCreated(pfd)
+    }
+
+    /**
+     * Hot-switch to a different server while the VPN tunnel stays up.
+     * Only supported for Xray-based protocols (VLESS, VMess, Trojan, SS, WireGuard).
+     * Falls back to a full reconnect for other protocols.
+     */
+    fun switchServer(config: VpnServerConfig) {
+        coroutineScope.launch {
+            val xray = currentProtocol as? com.carnelia.vpn.core.protocols.XrayVpnProtocol
+            if (xray != null) {
+                currentConfig = config
+                xray.switchServer(config)
+            } else {
+                // Fallback: disconnect + reconnect (e.g. OpenVPN)
+                disconnect()
+                connect(config)
+            }
+        }
     }
 
     /**

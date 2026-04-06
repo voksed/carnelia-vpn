@@ -22,7 +22,6 @@
     <string name="share_button">Share</string>
     <string name="menu_title">Menu</string>
     <string name="orbot_title">Orbot (Tor)</string>
-    <string name="private_browser_title">Private Browser</string>
     <string name="settings_title_menu">Settings</string>
     <string name="tor_i2p_settings">Tor &amp; I2P Settings</string>
     <string name="scan_to_import">Scan to Import</string>
@@ -37,6 +36,7 @@
     <string name="browser_opening">Opening Browser...</string>
     <string name="status_secured">SECURED</string>
     <string name="status_connecting">CONNECTING...</string>
+    <string name="status_switching">SWITCHING...</string>
     <string name="status_not_protected">NOT PROTECTED</string>
     <string name="select_server_btn">Select Server</string>
     <string name="received_label">RECEIVED</string>
@@ -44,6 +44,7 @@
     <string name="quick_connect">QUICK CONNECT</string>
     <string name="disconnect_caps">DISCONNECT</string>
     <string name="ton_vpn_title">TON VPN</string>
+    <string name="voks_vpn_title">VOKS VPN</string>
     <string name="carnelia_vpn_title">CARNELIA VPN</string>
     <string name="status_active">● ACTIVE</string>
     <string name="status_inactive">● INACTIVE</string>
@@ -53,6 +54,20 @@
     <string name="permission_denied_toast">VPN permission denied.</string>
     <string name="vpn_start_error">VPN Start Error: %1$s</string>
     <string name="error_prefix">Error: %1$s</string>
+    <string name="clipboard_not_readable">Clipboard does not contain readable text</string>
+    <string name="logs_copied_toast">Logs copied to clipboard</string>
+    <string name="geo_spoof_title">Подмена GPS</string>
+    <string name="geo_invalid_coordinates">Неправильные координаты</string>
+    <string name="geo_point_set">Точка установлена: %1$.6f, %2$.6f</string>
+    <string name="geo_enable_mock_location">Сначала включите фиктивные местоположения в настройках разработчика!</string>
+    <string name="manual_server_entry_title">Manual Server Entry</string>
+    <string name="manual_entry_paste_config_hint">Paste Config (vless://, vmess://, etc)</string>
+    <string name="manual_entry_empty_config">Config cannot be empty</string>
+    <string name="manual_entry_parse_configuration">Parse Configuration</string>
+    <string name="manual_entry_back">Back</string>
+    <string name="delete_button">Delete</string>
+    <string name="invalid_reality_public_key_warning">Invalid key: REALITY public key (pbk) looks like a placeholder. Remove and import a real server link.</string>
+    <string name="no_servers_found_add_one">No servers found. Add one!</string>
 
     <!-- SettingsActivity -->
     <string name="settings_title">Settings</string>
@@ -140,6 +155,7 @@
     <string name="allow_lan_summary">Share VPN connection with other devices on local network.</string>
     <string name="auto_start_title">App Auto-Start</string>
     <string name="auto_start_summary">Launch Carnelia VPN on device boot.</string>
+    <string name="auto_start_summary_desc">Launch Carnelia VPN on device boot.</string>
 
     <!-- Auto Connect Feature -->
     <string name="smart_auto_connect_title">Smart Auto-Connect</string>
@@ -192,9 +208,20 @@ Last Error: %5$s
     </string>
     <!-- Advanced Protection -->
     <string name="advanced_protection_section">ADVANCED PROTECTION</string>
-    <string name="netshield_title">AdGuard NetShield</string>
-    <string name="netshield_desc">Blocks ads, trackers and malicious domains at DNS level.</string>
+    <string name="netshield_title">AdGuard DNS</string>
+    <string name="netshield_desc">Use AdGuard DNS to block ads and trackers.</string>
     <string name="stealth_mode_title">Stealth Mode v2.0</string>
+
+    <string name="mux_protocols_title">Mux &amp; Protocols</string>
+    <string name="connectivity_title">Connectivity</string>
+    <string name="advanced_anti_dpi_title">Advanced Anti-DPI &amp; Stealth</string>
+    <string name="custom_params_title">Custom Parameters</string>
+    <string name="frag_desc_text">Splits packets to evade DPI inspection. Works 100% on most restricted networks.</string>
+    <string name="quic_mode_reject">Reject (Recommended)</string>
+    <string name="quic_mode_allow">Allow</string>
+    <string name="mux_tcp_concurrency">TCP Concurrency</string>
+    <string name="mux_udp_concurrency">UDP Concurrency</string>
+    <string name="mux_quic_mode">QUIC Mode</string>
     <string name="stealth_mode_desc">Forces strict TCP/TLS rules. Fixes YouTube buffering and severe DPI blocks.</string>
     <string name="secure_key_title">Secure Key Audit</string>
     <string name="secure_key_desc">Warns about unsafe, unencrypted, or suspicious keys before connection.</string>
@@ -263,9 +290,4 @@ Last Error: %5$s
     <string name="tor_external_title">Use External Orbot App</string>
     <string name="tor_internal_desc">Self-contained. Heavier on battery.</string>
     <string name="tor_external_desc">Routes via Orbot app. Requires Orbot installed.</string>
-    <string name="mux_tcp_concurrency">TCP Connections</string>
-    <string name="mux_udp_concurrency">xUDP Connections</string>
-    <string name="mux_quic_mode">QUIC Handling</string>
-    <string name="quic_mode_reject">Reject (Recommended)</string>
-    <string name="quic_mode_allow">Allow</string>
 </resources>

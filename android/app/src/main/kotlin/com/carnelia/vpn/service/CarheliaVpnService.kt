@@ -28,10 +28,20 @@ class CarheliaVpnService : VpnService() {
     companion object {
         const val ACTION_CONNECT = "com.carnelia.vpn.CONNECT"
         const val ACTION_DISCONNECT = "com.carnelia.vpn.DISCONNECT"
+        const val ACTION_RECONNECT = "com.carnelia.vpn.RECONNECT"
         const val EXTRA_CONFIG = "vpn_config"
         
         var currentState: ConnectionState = ConnectionState.DISCONNECTED
             private set
+
+        /** Returns true if pbk looks like a valid VLESS REALITY public key */
+        fun isValidRealityPbk(pbk: String): Boolean {
+            if (pbk.isBlank() || pbk.length < 20) return false
+            if (pbk.contains(':') || pbk.contains(' ')) return false
+            val lower = pbk.lowercase()
+            if (lower.startsWith("hash") || lower.startsWith("placeholder") || lower.startsWith("example")) return false
+            return true
+        }
     }
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
@@ -71,6 +81,18 @@ class CarheliaVpnService : VpnService() {
                     // Extract config from intent
                     val config = it.getSerializableExtra(EXTRA_CONFIG) as? VpnServerConfig
                     if (config != null) {
+                        // Detailed logging to trace config source
+                        AppLogger.log("Service: ACTION_CONNECT proto=${config.protocol.name} name='${config.name}' host=${config.host}:${config.port}")
+                        if (config.protocol.name == "VLESS") {
+                            val pbk = (config.config["pbk"] ?: config.config["publicKey"] ?: "(null)").trim()
+                            AppLogger.log("Service: VLESS pbk='$pbk' security=${config.config["security"]}")
+                            // Hard guard: reject invalid VLESS REALITY public keys
+                            if (config.config["security"] == "reality" && !isValidRealityPbk(pbk)) {
+                                AppLogger.error("Service: REJECTED VLESS REALITY config — invalid pbk='$pbk'. Ignoring connect request.")
+                                VpnGlobalState.setError("Сервер VLESS REALITY содержит недействительный ключ ($pbk). Удалите сервер и добавьте заново.")
+                                return@let
+                            }
+                        }
                         try {
                             startForeground(1, createNotification("Connecting to ${config.name}..."))
                             vpnManager.connect(config)
@@ -85,6 +107,23 @@ class CarheliaVpnService : VpnService() {
                     scope.launch {
                         vpnManager.disconnect()
                         stopSelf()
+                    }
+                }
+                ACTION_RECONNECT -> {
+                    val config = it.getSerializableExtra(EXTRA_CONFIG) as? VpnServerConfig
+                    if (config != null) {
+                        AppLogger.log("Service: ACTION_RECONNECT to ${config.host}:${config.port}")
+                        val pbkInvalid = config.protocol.name == "VLESS" &&
+                            config.config["security"] == "reality" &&
+                            !isValidRealityPbk((config.config["pbk"] ?: config.config["publicKey"] ?: "").trim())
+                        if (pbkInvalid) {
+                            val pbk = (config.config["pbk"] ?: config.config["publicKey"] ?: "").trim()
+                            AppLogger.error("Service: REJECTED RECONNECT — invalid pbk='$pbk'")
+                            VpnGlobalState.setError("Сервер VLESS REALITY содержит недействительный ключ ($pbk).")
+                        } else {
+                            vpnManager.switchServer(config)
+                            startForeground(1, createNotification("Switching to ${config.name}..."))
+                        }
                     }
                 }
                 else -> {}
@@ -186,8 +225,9 @@ class CarheliaVpnService : VpnService() {
         }
         
         vpnManager.onError { error ->
-            // Log error
+            // Log error and surface to UI
             AppLogger.error("Service: VPN Error occurred: $error")
+            VpnGlobalState.setError(error)
         }
     }
 

@@ -157,30 +157,27 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
         isRunning = true
         
         try {
-            // Check for Tor Mode
-            if (config.config["tor_mode"] == "true") {
-                AppLogger.log("XrayVpnProtocol: Starting Tor Service...")
-                com.carnelia.vpn.core.TorManager.startTor(context)
-                
-                // Wait for Tor to bootstrap (Max 60s)
-                try {
-                    withTimeout(60000) {
-                        while (!com.carnelia.vpn.core.TorManager.isConnected()) {
-                            delay(1000)
-                            // Optionally report detailed status if possible via callback
-                        }
-                    }
-                    AppLogger.log("XrayVpnProtocol: Tor Connected!")
-                } catch (e: TimeoutCancellationException) {
-                    AppLogger.error("Tor bootstrap timed out, proceeding anyway (might be slow)...")
-                }
-            }
-
             AppLogger.log("XrayVpnProtocol: Starting Xray Core via Process...")
             XrayCoreManager.startCore(context, config)
-            
-            // Wait for Xray to bind port (10808)
-            delay(500)
+
+            // Poll until Xray actually binds port 10808 (max 5 sec)
+            var waited = 0
+            while (waited < 5000) {
+                try {
+                    withContext(Dispatchers.IO) {
+                        java.net.Socket("127.0.0.1", XrayCoreManager.LOCAL_PORT).use {}
+                    }
+                    break  // port open
+                } catch (e: Exception) {
+                    delay(200)
+                    waited += 200
+                }
+            }
+            if (waited >= 5000) {
+                AppLogger.error("XrayVpnProtocol: Xray did not bind port ${XrayCoreManager.LOCAL_PORT} in 5s")
+                throw Exception("Xray failed to start (port ${XrayCoreManager.LOCAL_PORT} not open)")
+            }
+            AppLogger.log("XrayVpnProtocol: Xray ready on port ${XrayCoreManager.LOCAL_PORT} after ${waited}ms")
             
             // Xray is running. We report connected so VpnService creates interface.
             // Then onNetworkInterfaceCreated starts Tun2Socks (to localhost).
@@ -190,11 +187,48 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
         } catch (e: Exception) {
             AppLogger.error("XrayVpnProtocol: Start failed", e)
             XrayCoreManager.stopCore()
-            com.carnelia.vpn.core.TorManager.stopTor()
             return VpnErrorCode.PROTOCOL_ERROR
         }
     }
     
+    /**
+     * Hot server switch: restarts Xray with a new config without tearing down the TUN interface.
+     * The tun2socks tunnel keeps running; only the upstream Xray process is replaced.
+     */
+    suspend fun switchServer(config: VpnServerConfig) {
+        updateConnectionState(ConnectionState.RECONNECTING)
+        try {
+            AppLogger.log("XrayVpnProtocol: Hot-switching server to ${config.host}:${config.port}")
+            XrayCoreManager.stopCore()
+            delay(300)
+            XrayCoreManager.startCore(context, config)
+
+            // Wait until Xray binds port 10808 (max 5 s)
+            var waited = 0
+            while (waited < 5000) {
+                try {
+                    withContext(Dispatchers.IO) {
+                        java.net.Socket("127.0.0.1", XrayCoreManager.LOCAL_PORT).use {}
+                    }
+                    break
+                } catch (_: Exception) {
+                    delay(200)
+                    waited += 200
+                }
+            }
+            if (waited >= 5000) {
+                AppLogger.error("XrayVpnProtocol: Xray did not bind port ${XrayCoreManager.LOCAL_PORT} after switch")
+                updateConnectionState(ConnectionState.ERROR)
+                return
+            }
+            AppLogger.log("XrayVpnProtocol: Server switched, Xray ready after ${waited}ms")
+            updateConnectionState(ConnectionState.CONNECTED)
+        } catch (e: Exception) {
+            AppLogger.error("XrayVpnProtocol: switchServer failed", e)
+            updateConnectionState(ConnectionState.ERROR)
+        }
+    }
+
     override suspend fun stop() {
         isRunning = false
         updateConnectionState(ConnectionState.DISCONNECTING)
@@ -202,7 +236,6 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
             activeTunnel?.disconnect()
             activeTunnel = null
             XrayCoreManager.stopCore()
-            com.carnelia.vpn.core.TorManager.stopTor()
         } catch(e: Exception) {
              AppLogger.error("XrayVpnProtocol: Stop error", e)
         }
@@ -229,6 +262,7 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
                 AppLogger.log("XrayVpnProtocol: Connecting Tun2Socks to Local Xray Bridge...")
                 
                 // Config for Tun2Socks -> Localhost Xray Port
+                // Go/mobile shadowsocks client expects "method" as cipher field.
                 val jsonConfig = JSONObject()
                 jsonConfig.put("host", "127.0.0.1")
                 jsonConfig.put("port", XrayCoreManager.LOCAL_PORT)
@@ -288,6 +322,7 @@ object ProtocolFactory {
             
             com.carnelia.vpn.core.VpnProtocol.SHADOWSOCKS,
             com.carnelia.vpn.core.VpnProtocol.WIREGUARD,
+            com.carnelia.vpn.core.VpnProtocol.AMNEZIA_WG,
             com.carnelia.vpn.core.VpnProtocol.VLESS,
             com.carnelia.vpn.core.VpnProtocol.VMESS,
             com.carnelia.vpn.core.VpnProtocol.SOCKS,

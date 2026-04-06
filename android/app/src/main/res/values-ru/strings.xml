@@ -22,7 +22,6 @@
     <string name="share_button">Поделиться</string>
     <string name="menu_title">Меню</string>
     <string name="orbot_title">Orbot (Tor)</string>
-    <string name="private_browser_title">Приватный браузер</string>
     <string name="settings_title_menu">Настройки</string>
     <string name="tor_i2p_settings">Настройки Tor &amp; I2P</string>
     <string name="scan_to_import">Сканировать для импорта</string>
@@ -37,6 +36,7 @@
     <string name="browser_opening">Запуск браузера...</string>
     <string name="status_secured">ЗАЩИЩЕНО</string>
     <string name="status_connecting">ПОДКЛЮЧЕНИЕ...</string>
+    <string name="status_switching">СМЕНА СЕРВЕРА...</string>
     <string name="status_not_protected">НЕ ЗАЩИЩЕНО</string>
     <string name="select_server_btn">Выбрать сервер</string>
     <string name="received_label">ПОЛУЧЕНО</string>
@@ -53,6 +53,20 @@
     <string name="permission_denied_toast">Разрешение на VPN отклонено.</string>
     <string name="vpn_start_error">Ошибка запуска VPN: %1$s</string>
     <string name="error_prefix">Ошибка: %1$s</string>
+    <string name="clipboard_not_readable">Буфер обмена не содержит читаемого текста</string>
+    <string name="logs_copied_toast">Логи скопированы в буфер обмена</string>
+    <string name="geo_spoof_title">Подмена GPS</string>
+    <string name="geo_invalid_coordinates">Некорректные координаты</string>
+    <string name="geo_point_set">Точка установлена: %1$.6f, %2$.6f</string>
+    <string name="geo_enable_mock_location">Сначала включите Mock Location в настройках разработчика</string>
+    <string name="manual_server_entry_title">Ручной ввод сервера</string>
+    <string name="manual_entry_paste_config_hint">Вставьте конфиг (vless://, vmess:// и т.д.)</string>
+    <string name="manual_entry_empty_config">Конфиг не может быть пустым</string>
+    <string name="manual_entry_parse_configuration">Разобрать конфигурацию</string>
+    <string name="manual_entry_back">Назад</string>
+    <string name="delete_button">Удалить</string>
+    <string name="invalid_reality_public_key_warning">Неверный ключ: REALITY publicKey (pbk) похож на плейсхолдер. Удалите и добавьте реальную ссылку сервера.</string>
+    <string name="no_servers_found_add_one">Серверов нет. Добавьте сервер.</string>
 
     <!-- SettingsActivity -->
     <string name="settings_title">Настройки</string>
@@ -179,9 +193,20 @@ Android: %2$s
     </string>
     <!-- Advanced Protection -->
     <string name="advanced_protection_section">ПРОДВИНУТАЯ ЗАЩИТА</string>
-    <string name="netshield_title">AdGuard NetShield</string>
-    <string name="netshield_desc">Блокирует рекламу, трекеры и опасные домены на уровне DNS.</string>
+    <string name="netshield_title">AdGuard DNS</string>
+    <string name="netshield_desc">Использует AdGuard DNS для блокировки рекламы и трекеров.</string>
     <string name="stealth_mode_title">Stealth Mode v2.0</string>
+
+    <string name="mux_protocols_title">Протоколы и Mux</string>
+    <string name="connectivity_title">Соединение</string>
+    <string name="advanced_anti_dpi_title">Обход блокировок (Anti-DPI)</string>
+    <string name="custom_params_title">Пользовательские параметры</string>
+    <string name="frag_desc_text">Разделяет пакеты для обхода DPI. Работает на большинстве ограниченных сетей.</string>
+    <string name="quic_mode_reject">Отклонять (Рекомендуется)</string>
+    <string name="quic_mode_allow">Разрешать</string>
+    <string name="mux_tcp_concurrency">Потоки TCP</string>
+    <string name="mux_udp_concurrency">Потоки UDP</string>
+    <string name="mux_quic_mode">Режим QUIC</string>
     <string name="stealth_mode_desc">Принудительно использует TCP/TLS. Исправляет YouTube и обходит жесткие DPI блокировки.</string>
     <string name="secure_key_title">Аудит Ключей</string>
     <string name="secure_key_desc">Предупреждает о небезопасных, незашифрованных или подозрительных ключах.</string>
