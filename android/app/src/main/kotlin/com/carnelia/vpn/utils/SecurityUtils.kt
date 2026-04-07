@@ -57,6 +57,10 @@ object SecurityUtils {
                 safetyPoints += 4
                 report.append(context.getString(R.string.sec_proto_wg))
             }
+            VpnProtocol.AMNEZIA_WG -> {
+                safetyPoints += 5  // WireGuard + obfuscation layer
+                report.append("AmneziaWG — WireGuard с анти-DPI обфускацией.\n")
+            }
             VpnProtocol.OUTLINE -> {
                 safetyPoints += 2
                 report.append(context.getString(R.string.sec_proto_outline))

@@ -30,7 +30,7 @@ object ConfigParser {
 
     @Throws(IllegalArgumentException::class)
     fun parseOrThrow(input: String): VpnServerConfig {
-        val trimmed = input.trim()
+        val trimmed = sanitizeInput(input)
         if (trimmed.isEmpty()) error("Configuration string is empty", "Строка конфигурации пуста")
         
         val lower = trimmed.lowercase() // Use lowercase for prefix check
@@ -40,6 +40,11 @@ object ConfigParser {
             lower.startsWith("vless://") -> parseVless(trimmed)
             lower.startsWith("vmess://") -> parseVmess(trimmed)
             lower.startsWith("trojan://") -> parseTrojan(trimmed)
+            // WireGuard / AmneziaWG
+            lower.startsWith("wireguard://") -> parseWireguardUri(trimmed)
+            lower.startsWith("[interface]") ||
+            lower.contains("\n[interface]") ||
+            lower.contains("\r\n[interface]") -> parseWireguardIni(trimmed)
             // Simple heuristic for OpenVPN text content
             lower.contains("client") && lower.contains("remote ") -> parseOpenVpnContent(trimmed)
             lower.contains("dev tun") -> parseOpenVpnContent(trimmed)
@@ -49,10 +54,46 @@ object ConfigParser {
             // Attempt to decode base64 if no prefix
             isBase64(trimmed) -> parse(decodeBase64(trimmed)) ?: error("Failed to parse decoded config")
             else -> error(
-                "Unknown protocol or invalid format. Supported: vless://, vmess://, ss://, trojan://, OpenVPN",
-                "Неизвестный формат ключа. Поддерживается: vless, vmess, ss, trojan, openvpn"
+                "Unknown protocol or invalid format. Supported: vless://, vmess://, ss://, trojan://, wireguard://, OpenVPN",
+                "Неизвестный формат ключа. Поддерживается: vless, vmess, ss, trojan, wireguard, openvpn"
             )
         }
+    }
+
+    private fun sanitizeInput(input: String): String {
+        // Remove zero-width/BOM characters often introduced by messengers/clipboard.
+        var normalized = input
+            .replace("\u200B", "")
+            .replace("\u200C", "")
+            .replace("\u200D", "")
+            .replace("\uFEFF", "")
+            .replace("\u00A0", " ")
+            .trim()
+
+        // If user copied a message with additional text around a URL, extract the first supported URL.
+        val extracted = extractFirstSupportedUrl(normalized)
+        if (extracted != null) {
+            normalized = extracted
+        }
+
+        val lower = normalized.lowercase()
+        if (
+            lower.startsWith("vless://") ||
+            lower.startsWith("vmess://") ||
+            lower.startsWith("ss://") ||
+            lower.startsWith("trojan://") ||
+            lower.startsWith("wireguard://")
+        ) {
+            // URL keys should not contain whitespaces; collapse accidental line breaks/spaces.
+            normalized = normalized.replace(Regex("\\s+"), "")
+        }
+        return normalized
+    }
+
+    private fun extractFirstSupportedUrl(text: String): String? {
+        val regex = Regex("(?i)(vless|vmess|ss|trojan|wireguard)://[^\\s\"'<>]+")
+        val raw = regex.find(text)?.value ?: return null
+        return raw.trimEnd('.', ',', ';', '!', '?', ')', ']', '}', '"', '\'', '»')
     }
 
     private fun isBase64(str: String): Boolean {
@@ -207,35 +248,133 @@ object ConfigParser {
 
     private fun parseVless(url: String): VpnServerConfig {
         try {
-            val uri = Uri.parse(url)
-            val userInfo = uri.userInfo ?: error("VLESS: User info (UUID) missing", "VLESS: Отсутствует UUID пользователя")
-            val host = uri.host ?: error("VLESS: Host / IP missing", "VLESS: Отсутствует адрес сервера")
-            val port = uri.port
-            if (port == -1) error("VLESS: Port missing", "VLESS: Некорректный порт")
+            val schemeSep = url.indexOf("://")
+            if (schemeSep <= 0) {
+                error("VLESS: Invalid URL scheme", "VLESS: Некорректная схема URL")
+            }
+            val withoutScheme = url.substring(schemeSep + 3)
 
-            val queryMap = mutableMapOf<String, String>()
-            uri.queryParameterNames.forEach { key ->
-                uri.getQueryParameter(key)?.let { queryMap[key] = it }
+            val fragmentPart = withoutScheme.substringAfter('#', "")
+            val beforeFragment = withoutScheme.substringBefore('#')
+            val queryPart = beforeFragment.substringAfter('?', "")
+            val authority = beforeFragment.substringBefore('?')
+
+            val atIndex = authority.lastIndexOf('@')
+            if (atIndex <= 0 || atIndex == authority.lastIndex) {
+                error("VLESS: User info or host missing", "VLESS: Отсутствует UUID пользователя или хост")
             }
 
-            val name = uri.fragment?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) } ?: "VLESS Server"
+            val userInfo = authority.substring(0, atIndex)
+            val hostPortPart = authority.substring(atIndex + 1)
+
+            val host: String
+            val port: Int
+
+            if (hostPortPart.startsWith("[")) {
+                val close = hostPortPart.indexOf(']')
+                if (close == -1 || close == hostPortPart.lastIndex) {
+                    error("VLESS: Invalid IPv6 host", "VLESS: Некорректный IPv6 хост")
+                }
+                host = hostPortPart.substring(1, close)
+                val portPart = hostPortPart.substring(close + 1).removePrefix(":")
+                port = portPart.toIntOrNull() ?: error("VLESS: Invalid Port", "VLESS: Некорректный порт")
+            } else {
+                val colonIdx = hostPortPart.lastIndexOf(':')
+                if (colonIdx <= 0 || colonIdx == hostPortPart.lastIndex) {
+                    error("VLESS: Host / Port missing", "VLESS: Отсутствует хост или порт")
+                }
+                host = hostPortPart.substring(0, colonIdx)
+                val portPart = hostPortPart.substring(colonIdx + 1)
+                port = portPart.toIntOrNull() ?: error("VLESS: Invalid Port", "VLESS: Некорректный порт")
+            }
+
+            val queryMap = mutableMapOf<String, String>()
+            if (queryPart.isNotBlank()) {
+                // Support both & and ; as delimiters
+                queryPart.split(Regex("[&;]")).forEach { token ->
+                    if (token.isBlank()) return@forEach
+                    val rawKey = token.substringBefore("=", "").trim()
+                    val key = rawKey.removePrefix("amp;").lowercase()
+                    if (key.isBlank()) return@forEach
+                    val rawValue = token.substringAfter("=", "")
+                    val decodedValue = try {
+                        URLDecoder.decode(rawValue, StandardCharsets.UTF_8.toString())
+                    } catch (_: Exception) {
+                        rawValue
+                    }
+                    queryMap[key] = decodedValue
+                }
+            }
+
+            fun queryValue(vararg keys: String): String? {
+                for (key in keys) {
+                    val value = queryMap[key.lowercase()]
+                    if (!value.isNullOrBlank()) return value
+                }
+                return null
+            }
+
+            fun boolFlag(vararg keys: String): String {
+                val raw = queryValue(*keys)?.trim()?.lowercase() ?: return "0"
+                return if (raw == "1" || raw == "true" || raw == "yes" || raw == "on") "1" else "0"
+            }
+
+            val name = if (fragmentPart.isNotBlank()) {
+                try {
+                    URLDecoder.decode(fragmentPart, StandardCharsets.UTF_8.toString())
+                } catch (_: Exception) {
+                    fragmentPart
+                }
+            } else {
+                "VLESS Server"
+            }
 
             val config = mutableMapOf<String, String>()
             config["uuid"] = userInfo
-            config["type"] = queryMap["type"] ?: "tcp"
-            config["security"] = queryMap["security"] ?: "none"
-            config["fp"] = queryMap["fp"] ?: ""
-            config["sni"] = queryMap["sni"] ?: ""
-            config["pbk"] = queryMap["pbk"] ?: ""
-            config["sid"] = queryMap["sid"] ?: ""
-            config["flow"] = queryMap["flow"] ?: ""
+            val transport = when ((queryValue("type", "transport", "net") ?: "tcp").trim().lowercase()) {
+                "", "raw" -> "tcp"
+                "h2" -> "http"
+                "http-upgrade" -> "httpupgrade"
+                "splithttp", "split-http" -> "xhttp"
+                else -> (queryValue("type", "transport", "net") ?: "tcp").trim().lowercase()
+            }
+            val security = when ((queryValue("security", "tls") ?: "none").trim().lowercase()) {
+                "", "none" -> "none"
+                "tls", "reality" -> (queryValue("security", "tls") ?: "none").trim().lowercase()
+                else -> (queryValue("security", "tls") ?: "none").trim().lowercase()
+            }
+            config["type"] = transport
+            config["security"] = security
+            config["fp"] = queryValue("fp", "fingerprint") ?: ""
+            config["sni"] = queryValue("sni", "servername", "serverName", "host") ?: ""
+            config["pbk"] = queryValue("pbk", "publickey", "publicKey", "pk") ?: ""
+            config["sid"] = queryValue("sid", "shortid", "shortId") ?: ""
+            config["flow"] = queryValue("flow") ?: ""
+            config["path"] = queryValue("path") ?: "/"
+            config["spx"] = queryValue("spx") ?: ""
+            // Host header logic: prefer specific host param, fallback to sni
+            config["host_header"] = queryValue("host", "authority") ?: config["sni"] ?: ""
+            config["serviceName"] = queryValue("servicename", "serviceName") ?: ""
+            config["authority"] = queryValue("authority") ?: ""
+            config["mode"] = queryValue("mode") ?: ""
+            config["alpn"] = queryValue("alpn") ?: ""
+            config["allowInsecure"] = boolFlag("allowinsecure", "allowInsecure", "insecure")
             
             if (config["security"] == "reality") {
                 val pbk = config["pbk"] ?: ""
+                if (pbk.isBlank()) {
+                    // Include found keys in error for debugging
+                    val foundKeys = queryMap.keys.joinToString(", ")
+                    error(
+                        "VLESS REALITY: publicKey (pbk) is missing. Found params: $foundKeys", 
+                        "VLESS REALITY: не найден ключ pbk. Найдены параметры: $foundKeys"
+                    )
+                }
+                
                 config["publicKey"] = pbk
                 config["shortId"] = config["sid"] ?: ""
                 config["serverName"] = config["sni"] ?: ""
-                config["fingerprint"] = config["fp"] ?: "chrome"
+                config["fingerprint"] = if (config["fp"]!!.isNotBlank()) config["fp"]!! else "chrome"
             }
 
             return VpnServerConfig(
@@ -311,6 +450,97 @@ object ConfigParser {
             e.printStackTrace()
              error("VMess parse error: ${e.message}", "Ошибка разбора VMess: ${e.message}")
         }
+    }
+
+    private fun parseWireguardUri(url: String): VpnServerConfig {
+        val body = url.removePrefix("wireguard://").removePrefix("wireguard://")
+        val decoded = try { decodeBase64(body) } catch (e: Exception) { body }
+        if (decoded.lowercase().contains("[interface]")) return parseWireguardIni(decoded)
+        error("WireGuard: Cannot parse wireguard:// URI", "WireGuard: Неверный формат ссылки wireguard://")
+    }
+
+    /**
+     * Parses a WireGuard or AmneziaWG INI config.
+     * AmneziaWG is detected by presence of Jc/Jmin/Jmax/S1/S2/H1 obfuscation fields.
+     * Note: Jc/Jmin/Jmax/S1/S2/H1-H4 obfuscation is stored but requires amneziawg-go
+     * native library to actually work — connection falls back to plain WireGuard via Xray.
+     */
+    fun parseWireguardIni(content: String): VpnServerConfig {
+        var section = ""
+        val cfg = mutableMapOf<String, String>()
+        var host = ""
+        var port = 51820
+
+        for (rawLine in content.lines()) {
+            val line = rawLine.substringBefore("#").trim()
+            if (line.isEmpty()) continue
+            if (line.startsWith("[") && line.endsWith("]")) {
+                section = line.substring(1, line.length - 1).lowercase()
+                continue
+            }
+            val eqIdx = line.indexOf('=')
+            if (eqIdx <= 0) continue
+            val key = line.substring(0, eqIdx).trim().lowercase()
+            val value = line.substring(eqIdx + 1).trim()
+            when (section) {
+                "interface" -> when (key) {
+                    "privatekey"   -> cfg["private_key"] = value
+                    "address"      -> cfg["address"] = value
+                    "dns"          -> cfg["dns"] = value
+                    "listenport"   -> cfg["listen_port"] = value
+                    "mtu"          -> cfg["mtu"] = value
+                    // AmneziaWG obfuscation fields
+                    "jc"           -> cfg["Jc"] = value
+                    "jmin"         -> cfg["Jmin"] = value
+                    "jmax"         -> cfg["Jmax"] = value
+                    "s1"           -> cfg["S1"] = value
+                    "s2"           -> cfg["S2"] = value
+                    "h1"           -> cfg["H1"] = value
+                    "h2"           -> cfg["H2"] = value
+                    "h3"           -> cfg["H3"] = value
+                    "h4"           -> cfg["H4"] = value
+                }
+                "peer" -> when (key) {
+                    "publickey"          -> cfg["public_key"] = value
+                    "presharedkey"       -> cfg["preshared_key"] = value
+                    "allowedips"         -> cfg["allowed_ips"] = value
+                    "persistentkeepalive" -> cfg["keepalive"] = value
+                    "endpoint" -> {
+                        cfg["endpoint"] = value
+                        if (value.startsWith("[")) {
+                            val close = value.indexOf(']')
+                            if (close > 0) {
+                                host = value.substring(1, close)
+                                if (value.length > close + 1 && value[close + 1] == ':') {
+                                    port = value.substring(close + 2).toIntOrNull() ?: 51820
+                                }
+                            }
+                        } else {
+                            val parts = value.split(":")
+                            host = parts[0]
+                            port = parts.getOrNull(1)?.toIntOrNull() ?: 51820
+                        }
+                    }
+                }
+            }
+        }
+
+        if (host.isBlank()) error("WireGuard: endpoint missing", "WireGuard: Не указан адрес сервера (Endpoint)")
+        if (cfg["private_key"].isNullOrBlank()) error("WireGuard: PrivateKey missing", "WireGuard: Не указан PrivateKey")
+        if (cfg["public_key"].isNullOrBlank()) error("WireGuard: peer PublicKey missing", "WireGuard: Не указан PublicKey сервера")
+
+        val isAmnezia = listOf("Jc", "Jmin", "Jmax", "S1", "S2", "H1").any { cfg.containsKey(it) }
+        val protocol = if (isAmnezia) VpnProtocol.AMNEZIA_WG else VpnProtocol.WIREGUARD
+        val name = if (isAmnezia) "AmneziaWG Server" else "WireGuard Server"
+
+        return VpnServerConfig(
+            id = UUID.randomUUID().toString(),
+            name = name,
+            protocol = protocol,
+            host = host,
+            port = port,
+            config = cfg
+        )
     }
 
     private fun parseTrojan(url: String): VpnServerConfig {

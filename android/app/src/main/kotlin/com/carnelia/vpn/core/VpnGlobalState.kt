@@ -11,6 +11,9 @@ object VpnGlobalState {
     private val _stats = MutableStateFlow(VpnStats())
     val stats: StateFlow<VpnStats> = _stats.asStateFlow()
 
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
     // New Features Flags (Default to TRUE for the update)
     var isNetShieldEnabled: Boolean = true
     var isStealthModeEnabled: Boolean = true
@@ -22,5 +25,9 @@ object VpnGlobalState {
 
     fun updateStats(stats: VpnStats) {
         _stats.value = stats
+    }
+
+    fun setError(message: String?) {
+        _lastError.value = message
     }
 }

@@ -52,30 +52,6 @@ object PrefsManager {
     fun isSecureKeyCheckEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SECURE_KEYS, true) // Default On
     fun setSecureKeyCheckEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_SECURE_KEYS, enabled).apply()
 
-    fun isTorEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_TOR_ENABLED, false)
-    fun setTorEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_TOR_ENABLED, enabled).apply()
-
-    fun getTorSocksPort(context: Context): String = getPrefs(context).getString(KEY_TOR_SOCKS_PORT, "9050") ?: "9050"
-    fun setTorSocksPort(context: Context, port: String) = getPrefs(context).edit().putString(KEY_TOR_SOCKS_PORT, port).apply()
-
-    fun getTorHttpPort(context: Context): String = getPrefs(context).getString(KEY_TOR_HTTP_PORT, "8118") ?: "8118"
-    fun setTorHttpPort(context: Context, port: String) = getPrefs(context).edit().putString(KEY_TOR_HTTP_PORT, port).apply()
-
-    fun isTorUseBridges(context: Context): Boolean = getPrefs(context).getBoolean(KEY_TOR_USE_BRIDGES, false)
-    fun setTorUseBridges(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_TOR_USE_BRIDGES, enabled).apply()
-
-    fun getTorBridgeType(context: Context): String = getPrefs(context).getString(KEY_TOR_BRIDGE_TYPE, "obfs4") ?: "obfs4"
-    fun setTorBridgeType(context: Context, type: String) = getPrefs(context).edit().putString(KEY_TOR_BRIDGE_TYPE, type).apply()
-
-    fun getCustomTorBridges(context: Context): String = getPrefs(context).getString(KEY_TOR_BRIDGES, "") ?: ""
-    fun setCustomTorBridges(context: Context, bridges: String) = getPrefs(context).edit().putString(KEY_TOR_BRIDGES, bridges).apply()
-    
-    fun isI2pEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_I2P_ENABLED, false)
-    fun setI2pEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_I2P_ENABLED, enabled).apply()
-
-    fun isUseInternalTor(context: Context): Boolean = getPrefs(context).getBoolean(KEY_USE_INTERNAL_TOR, true)
-    fun setUseInternalTor(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_USE_INTERNAL_TOR, enabled).apply()
-
     fun isSplitTunnelingEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_SPLIT_TUNNELING, false)
     }
@@ -186,6 +162,7 @@ object PrefsManager {
                 editor.putString(KEY_FRAGMENT_LENGTH, "40-80")
                 editor.putString(KEY_FRAGMENT_INTERVAL, "30-50")
             }
+            // "custom" -> Do nothing, preserve existing custom values
         }
         editor.apply()
     }
@@ -197,17 +174,17 @@ object PrefsManager {
     fun setFragmentPackets(context: Context, value: String) {
         getPrefs(context).edit().putString(KEY_FRAGMENT_PACKETS, value).apply()
     }
-    
+
     fun getFragmentLength(context: Context): String {
-        return getPrefs(context).getString(KEY_FRAGMENT_LENGTH, "500-1000") ?: "500-1000"
+        return getPrefs(context).getString(KEY_FRAGMENT_LENGTH, "100-200") ?: "100-200"
     }
 
     fun setFragmentLength(context: Context, value: String) {
         getPrefs(context).edit().putString(KEY_FRAGMENT_LENGTH, value).apply()
     }
-    
+
     fun getFragmentInterval(context: Context): String {
-        return getPrefs(context).getString(KEY_FRAGMENT_INTERVAL, "1-3") ?: "1-3"
+        return getPrefs(context).getString(KEY_FRAGMENT_INTERVAL, "10-20") ?: "10-20"
     }
 
     fun setFragmentInterval(context: Context, value: String) {
@@ -221,6 +198,24 @@ object PrefsManager {
     fun setKillSwitchEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_KILL_SWITCH, enabled).apply()
     }
+
+    private const val KEY_FALLBACK_ENABLED = "fallback_enabled"
+    fun isFallbackEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_FALLBACK_ENABLED, true)
+    fun setFallbackEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_FALLBACK_ENABLED, enabled).apply()
+
+    private const val KEY_DOUBLE_TUNNEL_ENABLED = "double_tunnel_enabled"
+    private const val KEY_DOUBLE_TUNNEL_SERVER_ID = "double_tunnel_server_id"
+    fun isDoubleTunnelEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_DOUBLE_TUNNEL_ENABLED, false)
+    fun setDoubleTunnelEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_DOUBLE_TUNNEL_ENABLED, enabled).apply()
+    fun getDoubleTunnelServerId(context: Context): String = getPrefs(context).getString(KEY_DOUBLE_TUNNEL_SERVER_ID, "") ?: ""
+    fun setDoubleTunnelServerId(context: Context, id: String) = getPrefs(context).edit().putString(KEY_DOUBLE_TUNNEL_SERVER_ID, id).apply()
+
+    private const val KEY_NOISE_MODE_ENABLED = "noise_mode_enabled"
+    private const val KEY_NOISE_MODE_INTENSITY = "noise_mode_intensity"
+    fun isNoiseModeEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_NOISE_MODE_ENABLED, false)
+    fun setNoiseModeEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_NOISE_MODE_ENABLED, enabled).apply()
+    fun getNoiseModeIntensity(context: Context): String = getPrefs(context).getString(KEY_NOISE_MODE_INTENSITY, "low") ?: "low"
+    fun setNoiseModeIntensity(context: Context, intensity: String) = getPrefs(context).edit().putString(KEY_NOISE_MODE_INTENSITY, intensity).apply()
     
     fun getDnsServer(context: Context): String {
         return getPrefs(context).getString(KEY_DNS_SERVER, "1.1.1.1") ?: "1.1.1.1"
@@ -280,24 +275,68 @@ object PrefsManager {
         getPrefs(context).edit().putBoolean(KEY_GEO_ASSETS_INSTALLED, installed).apply()
     }
 
+    // ==================== GPS Spoof ====================
+    private const val KEY_GEO_LAT = "geo_spoof_lat"
+    private const val KEY_GEO_LON = "geo_spoof_lon"
+    private const val KEY_GEO_MOVE = "geo_spoof_move"
+    private const val KEY_GEO_SPEED = "geo_spoof_speed"
+    private const val KEY_GEO_BEARING = "geo_spoof_bearing"
+
+    fun getGeoLat(context: Context): Double = java.lang.Double.longBitsToDouble(getPrefs(context).getLong(KEY_GEO_LAT, java.lang.Double.doubleToLongBits(48.8566)))
+    fun getGeoLon(context: Context): Double = java.lang.Double.longBitsToDouble(getPrefs(context).getLong(KEY_GEO_LON, java.lang.Double.doubleToLongBits(2.3522)))
+    fun isGeoMovementEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_GEO_MOVE, false)
+    fun getGeoSpeed(context: Context): Float = getPrefs(context).getFloat(KEY_GEO_SPEED, 1.4f)
+    fun getGeoBearing(context: Context): Float = getPrefs(context).getFloat(KEY_GEO_BEARING, 0f)
+
+    fun setGeoCoords(context: Context, lat: Double, lon: Double) {
+        getPrefs(context).edit()
+            .putLong(KEY_GEO_LAT, java.lang.Double.doubleToLongBits(lat))
+            .putLong(KEY_GEO_LON, java.lang.Double.doubleToLongBits(lon))
+            .apply()
+    }
+
+    fun setGeoMovement(context: Context, enabled: Boolean, speedMs: Float, bearing: Float) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_GEO_MOVE, enabled)
+            .putFloat(KEY_GEO_SPEED, speedMs)
+            .putFloat(KEY_GEO_BEARING, bearing)
+            .apply()
+    }
+
     fun resetSettings(context: Context) {
         val editor = getPrefs(context).edit()
         editor.clear()
-        // We might want to keep some things like server list (managed by ServerRepository)
-        // This clears PREFS_NAME which only contains the settings keys defined above.
-        // Re-apply defaults explicitly if needed, but clear() removes them so getters will return defaults.
-        // However, for safety/clarity, we can just clear.
-        
-        // Defaults check:
-        // Split Tunneling: false
-        // Bypass RU: false
-        // Auto Connect: false
-        // Frag Enabled: true (WAIT, getter default is true)
-        // Frag params: 1-2, 500-1000, 1-3
-        // DNS: 8.8.8.8
-        
         getPrefs(context).edit().putInt(KEY_THEME_INDEX, 0).apply() // Reset to CLASSIC_RED
-        
         editor.apply()
     }
+
+    // Firewall — apps fully blocked from internet (VPN + direct)
+    private const val KEY_FIREWALL_BLOCKED = "firewall_blocked_apps"
+
+    fun getFirewallBlockedApps(context: Context): Set<String> =
+        getPrefs(context).getStringSet(KEY_FIREWALL_BLOCKED, emptySet()) ?: emptySet()
+
+    fun setFirewallBlockedApps(context: Context, packages: Set<String>) =
+        getPrefs(context).edit().putStringSet(KEY_FIREWALL_BLOCKED, packages).apply()
+
+    fun addFirewallBlockedApp(context: Context, pkg: String) {
+        val current = getFirewallBlockedApps(context).toMutableSet()
+        current.add(pkg)
+        setFirewallBlockedApps(context, current)
+    }
+
+    fun removeFirewallBlockedApp(context: Context, pkg: String) {
+        val current = getFirewallBlockedApps(context).toMutableSet()
+        current.remove(pkg)
+        setFirewallBlockedApps(context, current)
+    }
+
+    // Blocked domains (xray routing rule — blackhole outbound)
+    private const val KEY_BLOCKED_DOMAINS = "blocked_domains_list"
+
+    fun getBlockedDomains(context: Context): Set<String> =
+        getPrefs(context).getStringSet(KEY_BLOCKED_DOMAINS, emptySet()) ?: emptySet()
+
+    fun setBlockedDomains(context: Context, domains: Set<String>) =
+        getPrefs(context).edit().putStringSet(KEY_BLOCKED_DOMAINS, domains).apply()
 }

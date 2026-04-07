@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.carnelia.vpn.R
 import com.carnelia.vpn.core.VpnServerConfig
 import com.carnelia.vpn.utils.ConfigParser
 import java.util.UUID
@@ -24,6 +25,9 @@ fun ManualEntryDialog(
     var configString by remember { mutableStateOf("") }
     var parsedConfig by remember { mutableStateOf<VpnServerConfig?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val emptyConfigText = stringResource(R.string.manual_entry_empty_config)
+    val invalidKeyText = stringResource(R.string.invalid_key_format)
     
     // Editable fields
     var name by remember { mutableStateOf("") }
@@ -38,7 +42,7 @@ fun ManualEntryDialog(
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(
-                    "Manual Server Entry", 
+                    stringResource(R.string.manual_server_entry_title),
                     style = MaterialTheme.typography.titleLarge, 
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -50,7 +54,7 @@ fun ManualEntryDialog(
                     OutlinedTextField(
                         value = configString,
                         onValueChange = { configString = it; error = null },
-                        label = { Text("Paste Config (vless://, vmess://, etc)") },
+                        label = { Text(stringResource(R.string.manual_entry_paste_config_hint)) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF0088CC),
@@ -73,7 +77,7 @@ fun ManualEntryDialog(
                     Button(
                         onClick = {
                             if (configString.isBlank()) {
-                                error = "Config cannot be empty"
+                                error = emptyConfigText
                                 return@Button
                             }
                             try {
@@ -83,13 +87,13 @@ fun ManualEntryDialog(
                                 host = config.host
                                 port = config.port.toString()
                             } catch (e: Exception) {
-                                error = "Invalid config: ${e.message}"
+                                error = e.message ?: invalidKeyText
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088CC))
                     ) {
-                        Text("Parse Configuration")
+                        Text(stringResource(R.string.manual_entry_parse_configuration))
                     }
                 } else {
                     // Phase 2: Edit & Save
@@ -129,7 +133,7 @@ fun ManualEntryDialog(
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444))
                         ) {
-                            Text("Back")
+                            Text(stringResource(R.string.manual_entry_back))
                         }
                         Button(
                             onClick = {
@@ -145,7 +149,7 @@ fun ManualEntryDialog(
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088CC))
                         ) {
-                            Text("Add Server")
+                            Text(stringResource(R.string.add_server_title))
                         }
                     }
                 }

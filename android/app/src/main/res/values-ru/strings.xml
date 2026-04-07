@@ -44,6 +44,7 @@
     <string name="quick_connect">БЫСТРОЕ ПОДКЛЮЧЕНИЕ</string>
     <string name="disconnect_caps">ОТКЛЮЧИТЬ</string>
     <string name="ton_vpn_title">TON VPN</string>
+    <string name="voks_vpn_title">VOKS VPN</string>
     <string name="carnelia_vpn_title">CARNELIA VPN</string>
     <string name="status_active">● АКТИВНО</string>
     <string name="status_inactive">● НЕ АКТИВНО</string>
@@ -67,6 +68,18 @@
     <string name="delete_button">Удалить</string>
     <string name="invalid_reality_public_key_warning">Неверный ключ: REALITY publicKey (pbk) похож на плейсхолдер. Удалите и добавьте реальную ссылку сервера.</string>
     <string name="no_servers_found_add_one">Серверов нет. Добавьте сервер.</string>
+    <string name="rename_server_title">Переименовать сервер</string>
+    <string name="rename_server_hint">Название сервера</string>
+    <string name="save_action">Сохранить</string>
+    <string name="rename_tooltip">Переименовать</string>
+    <string name="subscriptions_title">Подписки</string>
+    <string name="subscriptions_desc">Автообновление списков серверов по URL</string>
+    <string name="add_subscription_title">Добавить подписку</string>
+    <string name="subscription_name_hint">Название (необязательно)</string>
+    <string name="subscription_url_hint">URL</string>
+    <string name="no_subscriptions_yet">Подписок нет. Добавьте одну!</string>
+    <string name="fallback_title">Авто Fallback</string>
+    <string name="fallback_desc">Перейти на следующий сервер при ошибке</string>
 
     <!-- SettingsActivity -->
     <string name="settings_title">Настройки</string>
@@ -251,6 +264,7 @@ Android: %2$s
     <string name="theme_light_purple">Светло-фиолетовая</string>
     <string name="theme_light">Светлая</string>
     <string name="theme_dark">Темная</string>
+    <string name="theme_ton">Стиль Toncoin</string>
     <string name="theme_system">Системная</string>
     <string name="theme_secret">Voks</string>
     
@@ -283,6 +297,36 @@ Android: %2$s
     <string name="donate_ton_title">Криптовалюта TON</string>
     <string name="address_copied_toast">Адрес скопирован!</string>
     <string name="copy_address_btn">Скопировать адрес</string>
+
+    <!-- Double Tunnel -->
+    <string name="double_tunnel_title">Двойной туннель</string>
+    <string name="double_tunnel_desc">Маршрутизация через два сервера для максимальной анонимности</string>
+    <string name="double_tunnel_first_server">Первый сервер (вход)</string>
+    <string name="double_tunnel_second_server">Второй сервер (выход)</string>
+    <string name="double_tunnel_select">Выбрать сервер</string>
+    <string name="double_tunnel_not_selected">Не выбран</string>
+    <string name="double_tunnel_warning">Двойной туннель увеличивает задержку. Используйте только с быстрыми серверами.</string>
+    <string name="double_tunnel_same_server_error">Второй сервер должен отличаться от первого.</string>
+
+    <!-- Noise Mode -->
+    <string name="noise_mode_title">Режим шума</string>
+    <string name="noise_mode_desc">Генерация фейкового трафика для обмана систем DPI</string>
+    <string name="noise_intensity_label">Интенсивность</string>
+    <string name="noise_low">Низкая (каждые 30 сек)</string>
+    <string name="noise_medium">Средняя (каждые 10 сек)</string>
+    <string name="noise_high">Высокая (каждые 3 сек)</string>
+    <string name="noise_mode_active">Режим шума: активен</string>
+
+    <!-- Traffic Map -->
+    <string name="traffic_map_title">Карта трафика</string>
+    <string name="traffic_map_subtitle">Визуализация трафика приложений в реальном времени</string>
+    <string name="traffic_map_not_connected">Подключитесь к VPN для просмотра трафика</string>
+    <string name="traffic_map_app_count">%d приложений с активным трафиком</string>
+    <string name="traffic_low">Низкий</string>
+    <string name="traffic_medium">Средний</string>
+    <string name="traffic_high">Высокий</string>
+    <string name="traffic_map_vpn_node">VPN</string>
+    <string name="traffic_map_no_traffic">Данные о трафике отсутствуют</string>
 
     <!-- Tor Settings -->
     <string name="tor_integration_title">Интеграция сети Tor</string>

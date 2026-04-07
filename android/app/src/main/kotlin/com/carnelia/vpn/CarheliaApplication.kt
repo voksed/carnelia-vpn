@@ -22,10 +22,5 @@ class CarheliaApplication : Application() {
         AppLogger.log("CarheliaApplication: Started")
         
         networkMonitor.startMonitoring()
-        
-        // Attempt global install of geo assets (async)
-        CoroutineScope(Dispatchers.IO).launch {
-            com.carnelia.vpn.core.AssetsManager.installGeoAssets(this@CarheliaApplication)
-        }
     }
 }

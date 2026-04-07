@@ -14,7 +14,7 @@ import com.carnelia.vpn.core.VpnStats
 import com.carnelia.vpn.utils.AppLogger
 import com.carnelia.vpn.utils.PrefsManager
 import com.carnelia.vpn.core.VpnGlobalState
-
+import java.util.concurrent.atomic.AtomicLong
 import android.service.quicksettings.TileService
 import com.carnelia.vpn.core.TrafficStatsManager
 import com.carnelia.vpn.core.TrafficSession
@@ -29,6 +29,7 @@ class CarheliaVpnService : VpnService() {
         const val ACTION_CONNECT = "com.carnelia.vpn.CONNECT"
         const val ACTION_DISCONNECT = "com.carnelia.vpn.DISCONNECT"
         const val ACTION_RECONNECT = "com.carnelia.vpn.RECONNECT"
+        const val ACTION_REBUILD_INTERFACE = "com.carnelia.vpn.REBUILD_INTERFACE"
         const val EXTRA_CONFIG = "vpn_config"
         
         var currentState: ConnectionState = ConnectionState.DISCONNECTED
@@ -49,7 +50,12 @@ class CarheliaVpnService : VpnService() {
     
     private lateinit var vpnManager: VpnManager
     private var currentInterface: ParcelFileDescriptor? = null
-    private var connectionStartTime: Long = 0
+    private val connectionStartTime = AtomicLong(0L)
+    private var lastNotificationUpdate = 0L
+    private var currentConfig: VpnServerConfig? = null
+    private var fallbackAttempts: Int = 0
+    private val maxFallbackAttempts = 3
+    private lateinit var serverRepository: com.carnelia.vpn.data.ServerRepository
 
     inner class LocalBinder : Binder() {
         fun getService(): CarheliaVpnService = this@CarheliaVpnService
@@ -59,6 +65,7 @@ class CarheliaVpnService : VpnService() {
         super.onCreate()
         AppLogger.log("Service: onCreate")
         vpnManager = VpnManager(this, scope)
+        serverRepository = com.carnelia.vpn.data.ServerRepository(this)
         setupVpnListeners()
         
         // Start foreground immediately to prevent crash on Android 8+
@@ -81,6 +88,8 @@ class CarheliaVpnService : VpnService() {
                     // Extract config from intent
                     val config = it.getSerializableExtra(EXTRA_CONFIG) as? VpnServerConfig
                     if (config != null) {
+                        currentConfig = config
+                        fallbackAttempts = 0
                         // Detailed logging to trace config source
                         AppLogger.log("Service: ACTION_CONNECT proto=${config.protocol.name} name='${config.name}' host=${config.host}:${config.port}")
                         if (config.protocol.name == "VLESS") {
@@ -126,6 +135,17 @@ class CarheliaVpnService : VpnService() {
                         }
                     }
                 }
+                ACTION_REBUILD_INTERFACE -> {
+                    // Hot-reload TUN interface (re-apply split tunnel / firewall rules).
+                    // Xray process keeps running — only TUN fd is rebuilt.
+                    if (currentState == ConnectionState.CONNECTED) {
+                        AppLogger.log("Service: ACTION_REBUILD_INTERFACE — rebuilding TUN")
+                        scope.launch {
+                            closeVpnInterface()
+                            establishVpnInterface()
+                        }
+                    }
+                }
                 else -> {}
             }
         }
@@ -153,22 +173,23 @@ class CarheliaVpnService : VpnService() {
             VpnGlobalState.updateState(state)
             
             if (state == ConnectionState.CONNECTED) {
-                connectionStartTime = System.currentTimeMillis()
+                connectionStartTime.set(System.currentTimeMillis())
             } else if (state == ConnectionState.DISCONNECTED) {
                 // Save Statistics
                 val endTime = System.currentTimeMillis()
-                val duration = (endTime - connectionStartTime) / 1000
-                if (connectionStartTime > 0 && duration > 5) { // Only save sessions > 5 seconds
+                val startTime = connectionStartTime.get()
+                val duration = (endTime - startTime) / 1000
+                if (startTime > 0 && duration > 5) { // Only save sessions > 5 seconds
                     val finalStats = VpnGlobalState.stats.value
                     if (finalStats.bytesReceived > 0 || finalStats.bytesSent > 0) {
                         AppLogger.log("Service: Saving session. Duration: ${duration}s, Rx: ${finalStats.bytesReceived}, Tx: ${finalStats.bytesSent}")
                         TrafficStatsManager.saveSession(
                             this@CarheliaVpnService,
-                            TrafficSession(connectionStartTime, duration, finalStats.bytesReceived, finalStats.bytesSent)
+                            TrafficSession(startTime, duration, finalStats.bytesReceived, finalStats.bytesSent)
                         )
                     }
                 }
-                connectionStartTime = 0
+                connectionStartTime.set(0L)
             }
 
             if (android.os.Build.VERSION.SDK_INT >= 24) {
@@ -182,34 +203,29 @@ class CarheliaVpnService : VpnService() {
             when (state) {
                 ConnectionState.CONNECTED -> {
                     // Start measuring session duration
-                    connectionStartTime = System.currentTimeMillis()
+                    connectionStartTime.set(System.currentTimeMillis())
                     establishVpnInterface()
+                    // Noise Mode
+                    if (PrefsManager.isNoiseModeEnabled(this)) {
+                        com.carnelia.vpn.core.NoiseModeManager.start(PrefsManager.getNoiseModeIntensity(this))
+                    }
                 }
                 ConnectionState.CONNECTING -> {
                      // Reset global stats to avoid phantom usage from previous sessions
                      VpnGlobalState.updateStats(VpnStats(0, 0))
                 }
                 ConnectionState.DISCONNECTED -> {
-                    // Soft Kill Switch Logic:
-                    // Only close VPN Interface if it was a manual disconnect or KS is disabled.
-                    // However, we don't easily know if it's manual here unless we track intent.
-                    // Simpler logic: If disconnected, we usually want to close to allow normal internet.
-                    // But if KS is on, we want to BLOCK.
-                    // The issue is: If we keep the interface open with no backend, packets die (KS works).
-                    // But how does the user RECONNECT? They need to click Connect in app.
-                    
-                    // If we assume DISCONNECTED means "Stopped completely", we should close.
-                    // If it was "Reconnecting" (ERROR -> RETRY), the state would be different?
-                    // VpnManager handles retries. If it emits DISCONNECTED, it gave up.
-                    
+                    com.carnelia.vpn.core.NoiseModeManager.stop()
                     closeVpnInterface()
                 }
                 ConnectionState.ERROR -> {
-                    // Error happened. 
+                    com.carnelia.vpn.core.NoiseModeManager.stop()
+                    if (PrefsManager.isFallbackEnabled(this)) {
+                        tryFallback()
+                    }
                     if (PrefsManager.isKillSwitchEnabled(this)) {
                          AppLogger.log("Service: Soft Kill Switch Active - Keeping Interface Up to block traffic")
-                         // Do NOT close interface. Traffic goes to blackhole.
-                         updateNotification(VpnStats(0,0)) // Just update notification
+                         updateNotification(VpnStats(0,0))
                     } else {
                          closeVpnInterface()
                     }
@@ -228,6 +244,26 @@ class CarheliaVpnService : VpnService() {
             // Log error and surface to UI
             AppLogger.error("Service: VPN Error occurred: $error")
             VpnGlobalState.setError(error)
+        }
+    }
+
+    private fun tryFallback() {
+        if (fallbackAttempts >= maxFallbackAttempts) {
+            AppLogger.log("Service: Fallback exhausted after $maxFallbackAttempts attempts")
+            return
+        }
+        val servers = serverRepository.getServers()
+        if (servers.size < 2) return
+        val nextServer = servers.firstOrNull { it.id != currentConfig?.id } ?: return
+        fallbackAttempts++
+        AppLogger.log("Service: Fallback attempt $fallbackAttempts → ${nextServer.name}")
+        scope.launch {
+            delay(2000)
+            currentConfig = nextServer
+            serverRepository.setLastUsedServer(nextServer)
+            VpnGlobalState.updateState(ConnectionState.RECONNECTING)
+            vpnManager.switchServer(nextServer)
+            startForeground(1, createNotification("Fallback: ${nextServer.name}"))
         }
     }
 
@@ -263,7 +299,21 @@ class CarheliaVpnService : VpnService() {
             }
             
             // Split Tunneling Logic
-            if (PrefsManager.isSplitTunnelingEnabled(this)) {
+            val firewallBlocked = PrefsManager.getFirewallBlockedApps(this)
+            val hasFirewall = firewallBlocked.isNotEmpty()
+
+            if (hasFirewall) {
+                // Firewall mode: add blocked apps to disallowedApplication.
+                // They won't route through VPN tunnel.
+                // NOTE: setUnderlyingNetworks(emptyArray()) is intentionally NOT called —
+                // it causes Android to mark the VPN as "no connectivity" and ALL apps lose internet.
+                AppLogger.log("Service: Firewall mode — disallowing ${firewallBlocked.size} apps")
+                for (pkg in firewallBlocked) {
+                    try { builder.addDisallowedApplication(pkg) } catch (e: Exception) {}
+                }
+                // Exclude self to prevent Xray loop
+                try { builder.addDisallowedApplication(packageName) } catch (e: Exception) {}
+            } else if (PrefsManager.isSplitTunnelingEnabled(this)) {
                 val selectedApps = PrefsManager.getSelectedApps(this)
                 val mode = PrefsManager.getSplitTunnelMode(this) // "allow" or "disallow"
 
@@ -283,7 +333,7 @@ class CarheliaVpnService : VpnService() {
                 } else {
                     AppLogger.log("Service: Split Tunneling active but list empty ($mode) (Proxying all).")
                 }
-                
+
                 // Exclude self to avoid Xray Loop (since Xray runs under app's UID)
                 if (mode == "disallow" && !selectedApps.contains(packageName)) {
                      try {
@@ -336,14 +386,18 @@ class CarheliaVpnService : VpnService() {
     }
 
     private fun updateNotification(stats: com.carnelia.vpn.core.VpnStats) {
+        val now = System.currentTimeMillis()
+        if (now - lastNotificationUpdate < 500) return // debounce 500ms
+        lastNotificationUpdate = now
         try {
             val rx = android.text.format.Formatter.formatFileSize(this, stats.bytesReceived)
             val tx = android.text.format.Formatter.formatFileSize(this, stats.bytesSent)
             
             // Calculate Duration
             var durationText = ""
-            if (connectionStartTime > 0) {
-                val diff = (System.currentTimeMillis() - connectionStartTime) / 1000
+            val startTime = connectionStartTime.get()
+            if (startTime > 0) {
+                val diff = (now - startTime) / 1000
                 val h = diff / 3600
                 val m = (diff % 3600) / 60
                 val s = diff % 60

@@ -43,6 +43,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.BorderStroke
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
+import androidx.compose.material.icons.filled.Refresh
 import com.carnelia.vpn.ui.theme.AppTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -595,6 +599,70 @@ fun ServerSelectionDialog(
 ) {
     var servers by remember { mutableStateOf(repository.getServers()) }
     var showManualAdd by remember { mutableStateOf(false) }
+    var serverToRename by remember { mutableStateOf<VpnServerConfig?>(null) }
+    var renameText by remember { mutableStateOf("") }
+    var pingResults by remember { mutableStateOf<Map<String, Int?>>(emptyMap()) }
+    var isPinging by remember { mutableStateOf(false) }
+    val pingScope = rememberCoroutineScope()
+
+    fun pingServers(list: List<VpnServerConfig>) {
+        if (isPinging) return
+        isPinging = true
+        pingResults = emptyMap()
+        pingScope.launch(Dispatchers.IO) {
+            val results = mutableMapOf<String, Int?>()
+            for (server in list) {
+                if (!isActive) break
+                val ping = try {
+                    val start = System.currentTimeMillis()
+                    java.net.Socket().use { it.connect(java.net.InetSocketAddress(server.host, server.port), 3000) }
+                    (System.currentTimeMillis() - start).toInt()
+                } catch (e: Exception) { null }
+                results[server.id] = ping
+                withContext(Dispatchers.Main) { pingResults = results.toMap() }
+            }
+            withContext(Dispatchers.Main) { isPinging = false }
+        }
+    }
+
+    LaunchedEffect(servers) { delay(300); pingServers(servers) }
+
+    serverToRename?.let { server ->
+        AlertDialog(
+            onDismissRequest = { serverToRename = null },
+            title = { Text(stringResource(R.string.rename_server_title), color = Color.White) },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text(stringResource(R.string.rename_server_hint), color = Color.Gray) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = if (currentTheme == AppTheme.TON) Color(0xFF0088CC) else Color(0xFFFF1744),
+                        unfocusedBorderColor = Color(0xFF555555)
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val trimmed = renameText.trim()
+                    if (trimmed.isNotBlank()) {
+                        repository.updateServer(server.copy(name = trimmed))
+                        servers = repository.getServers()
+                    }
+                    serverToRename = null
+                }) { Text(stringResource(R.string.save_action), color = if (currentTheme == AppTheme.TON) Color(0xFF0088CC) else Color(0xFFFF1744)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { serverToRename = null }) {
+                    Text(stringResource(R.string.cancel_action), color = Color.Gray)
+                }
+            },
+            containerColor = Color(0xFF1A1A1A)
+        )
+    }
 
     if (showManualAdd) {
         ManualEntryDialog(
@@ -621,8 +689,18 @@ fun ServerSelectionDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(stringResource(R.string.select_server_btn), style = MaterialTheme.typography.titleLarge, color = Color.White)
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, null, tint = Color.Gray)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isPinging) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.Gray)
+                                Spacer(Modifier.width(4.dp))
+                            } else {
+                                IconButton(onClick = { pingServers(servers) }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Refresh, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            IconButton(onClick = onDismiss) {
+                                Icon(Icons.Default.Close, null, tint = Color.Gray)
+                            }
                         }
                     }
                     
@@ -662,7 +740,7 @@ fun ServerSelectionDialog(
 
                     // List
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(servers) { server ->
+                        items(servers, key = { it.id }) { server ->
                             val isSelected = activeInfo?.id == server.id
                             Card(
                                 onClick = { onServerSelected(server) },
@@ -679,7 +757,38 @@ fun ServerSelectionDialog(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(server.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                        Text(server.host, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                                        val pingMs = pingResults[server.id]
+                                        val pingText = when {
+                                            !pingResults.containsKey(server.id) -> server.host
+                                            pingMs == null -> "✕ timeout"
+                                            pingMs < 100 -> "● ${pingMs}ms"
+                                            pingMs < 300 -> "● ${pingMs}ms"
+                                            else -> "● ${pingMs}ms"
+                                        }
+                                        val pingColor = when {
+                                            !pingResults.containsKey(server.id) -> Color.Gray
+                                            pingMs == null -> Color(0xFFFF4444)
+                                            pingMs < 100 -> Color(0xFF00CC66)
+                                            pingMs < 300 -> Color(0xFFFFAA00)
+                                            else -> Color(0xFFFF4444)
+                                        }
+                                        Text(pingText, color = pingColor, fontSize = 12.sp, maxLines = 1)
+                                    }
+
+                                    // Rename Button
+                                    IconButton(
+                                        onClick = {
+                                            renameText = server.name
+                                            serverToRename = server
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Edit,
+                                            contentDescription = stringResource(R.string.rename_tooltip),
+                                            tint = Color.Gray.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
 
                                     // Delete Button

@@ -66,6 +66,18 @@
     <string name="manual_entry_parse_configuration">Parse Configuration</string>
     <string name="manual_entry_back">Back</string>
     <string name="delete_button">Delete</string>
+    <string name="rename_server_title">Rename Server</string>
+    <string name="rename_server_hint">Server name</string>
+    <string name="save_action">Save</string>
+    <string name="rename_tooltip">Rename</string>
+    <string name="subscriptions_title">Subscriptions</string>
+    <string name="subscriptions_desc">Auto-update server lists from URL</string>
+    <string name="add_subscription_title">Add Subscription</string>
+    <string name="subscription_name_hint">Name (optional)</string>
+    <string name="subscription_url_hint">URL</string>
+    <string name="no_subscriptions_yet">No subscriptions. Add one!</string>
+    <string name="fallback_title">Auto Fallback</string>
+    <string name="fallback_desc">Switch to next server on connection error</string>
     <string name="invalid_reality_public_key_warning">Invalid key: REALITY public key (pbk) looks like a placeholder. Remove and import a real server link.</string>
     <string name="no_servers_found_add_one">No servers found. Add one!</string>
 
@@ -290,4 +302,34 @@ Last Error: %5$s
     <string name="tor_external_title">Use External Orbot App</string>
     <string name="tor_internal_desc">Self-contained. Heavier on battery.</string>
     <string name="tor_external_desc">Routes via Orbot app. Requires Orbot installed.</string>
+
+    <!-- Double Tunnel -->
+    <string name="double_tunnel_title">Double Tunnel</string>
+    <string name="double_tunnel_desc">Route through two servers for maximum anonymity</string>
+    <string name="double_tunnel_first_server">First Server (Entry)</string>
+    <string name="double_tunnel_second_server">Second Server (Exit)</string>
+    <string name="double_tunnel_select">Select server</string>
+    <string name="double_tunnel_not_selected">Not selected</string>
+    <string name="double_tunnel_warning">Double Tunnel increases latency. Use with fast servers only.</string>
+    <string name="double_tunnel_same_server_error">Second server must differ from the first.</string>
+
+    <!-- Noise Mode -->
+    <string name="noise_mode_title">Noise Mode</string>
+    <string name="noise_mode_desc">Generate fake traffic to confuse DPI systems</string>
+    <string name="noise_intensity_label">Intensity</string>
+    <string name="noise_low">Low (every 30s)</string>
+    <string name="noise_medium">Medium (every 10s)</string>
+    <string name="noise_high">High (every 3s)</string>
+    <string name="noise_mode_active">Noise Mode: Active</string>
+
+    <!-- Traffic Map -->
+    <string name="traffic_map_title">Traffic Map</string>
+    <string name="traffic_map_subtitle">Real-time per-app traffic visualization</string>
+    <string name="traffic_map_not_connected">Connect to VPN to see traffic</string>
+    <string name="traffic_map_app_count">%d apps with active traffic</string>
+    <string name="traffic_low">Low</string>
+    <string name="traffic_medium">Medium</string>
+    <string name="traffic_high">High</string>
+    <string name="traffic_map_vpn_node">VPN</string>
+    <string name="traffic_map_no_traffic">No traffic data yet</string>
 </resources>

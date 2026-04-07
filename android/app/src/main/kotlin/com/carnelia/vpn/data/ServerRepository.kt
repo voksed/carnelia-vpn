@@ -16,6 +16,82 @@ class ServerRepository(context: Context) {
     private val gson = Gson()
     private val SERVERS_KEY = "saved_servers"
     private val LAST_USED_KEY = "last_used_server_id"
+    private val DEFAULT_ADDED_KEY = "default_server_added"
+    private val DEFAULT_SERVER_VERSION_KEY = "default_server_version"
+    private val CURRENT_DEFAULT_VERSION = 2
+
+    init {
+        cleanBrokenServers()
+        checkAndAddDefaultServer()
+    }
+
+    /**
+     * Auto-removes VLESS REALITY servers saved with invalid/placeholder public keys
+     * (e.g. "Hash32:", "example", empty strings) that will always fail to connect.
+     */
+    private fun cleanBrokenServers() {
+        val servers = getServers().toMutableList()
+        val before = servers.size
+        servers.removeAll { config ->
+            val isBroken = config.protocol == com.carnelia.vpn.core.VpnProtocol.VLESS &&
+                (config.config["security"] == "reality" || config.config["security"] == "reality") &&
+                run {
+                    val pbk = (config.config["pbk"] ?: config.config["publicKey"] ?: "").trim()
+                    pbk.isBlank() || pbk.contains(':') || pbk.contains(' ') ||
+                        pbk.length < 30 || pbk.lowercase().startsWith("hash") ||
+                        pbk.lowercase().startsWith("placeholder") || pbk.lowercase().startsWith("example")
+                }
+            if (isBroken) {
+                com.carnelia.vpn.utils.AppLogger.log("Repository: Removed broken VLESS REALITY server '${config.name}' (invalid publicKey).")
+            }
+            isBroken
+        }
+        if (servers.size != before) {
+            saveServers(servers)
+            // If last used server was removed, clear it
+            val lastId = prefs.getString(LAST_USED_KEY, null)
+            if (lastId != null && servers.none { it.id == lastId }) {
+                prefs.edit().remove(LAST_USED_KEY).apply()
+            }
+        }
+    }
+
+    private fun checkAndAddDefaultServer() {
+        val defaultKey = "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTptbnhiQVJsSmYwcUp1eUlUc0JZa2lF@151.243.109.219:6932/?outline=1"
+        val storedVersion = prefs.getInt(DEFAULT_SERVER_VERSION_KEY, 0)
+
+        if (!prefs.getBoolean(DEFAULT_ADDED_KEY, false)) {
+            // First launch — add default server
+            val config = com.carnelia.vpn.utils.ConfigParser.parse(defaultKey)
+            if (config != null) {
+                val defaultServer = config.copy(
+                    id = "default_server_id",
+                    name = "Carnelia Free VPN",
+                    country = "Default"
+                )
+                addServer(defaultServer)
+                setLastUsedServer(defaultServer)
+                com.carnelia.vpn.utils.AppLogger.log("Repository: Added default VPN server.")
+            }
+            prefs.edit()
+                .putBoolean(DEFAULT_ADDED_KEY, true)
+                .putInt(DEFAULT_SERVER_VERSION_KEY, CURRENT_DEFAULT_VERSION)
+                .apply()
+        } else if (storedVersion < CURRENT_DEFAULT_VERSION) {
+            // Existing install — silently update the default server entry
+            val config = com.carnelia.vpn.utils.ConfigParser.parse(defaultKey)
+            if (config != null) {
+                val defaultServer = config.copy(
+                    id = "default_server_id",
+                    name = "Carnelia Free VPN",
+                    country = "Default"
+                )
+                addServer(defaultServer) // replaces by id
+                com.carnelia.vpn.utils.AppLogger.log("Repository: Updated default VPN server to v$CURRENT_DEFAULT_VERSION.")
+            }
+            prefs.edit().putInt(DEFAULT_SERVER_VERSION_KEY, CURRENT_DEFAULT_VERSION).apply()
+        }
+    }
 
     fun getServers(): List<VpnServerConfig> {
         val json = prefs.getString(SERVERS_KEY, "[]")
@@ -115,8 +191,15 @@ class ServerRepository(context: Context) {
 
     fun removeServer(id: String) {
         val current = getServers().toMutableList()
-        current.removeAll { it.id == id }
-        saveServers(current)
+        val removed = current.removeAll { it.id == id }
+        if (removed) {
+            saveServers(current)
+            // clear last used if it was the removed one
+            val lastUsed = prefs.getString(LAST_USED_KEY, null)
+            if (lastUsed == id) {
+                prefs.edit().remove(LAST_USED_KEY).apply()
+            }
+        }
     }
 
     fun saveServers(servers: List<VpnServerConfig>) {

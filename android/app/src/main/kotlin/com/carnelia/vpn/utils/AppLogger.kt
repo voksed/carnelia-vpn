@@ -18,33 +18,34 @@ object AppLogger {
     val logs: List<LogEntry> get() = _logs
 
     private val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     fun log(message: String) {
-        addEntry(LogLevel.INFO, message)
         android.util.Log.i("CarneliaDebug", message)
-        System.out.println("CarneliaDebug: " + message)
+        addEntry(LogLevel.INFO, message)
     }
 
     fun debug(message: String) {
-        addEntry(LogLevel.DEBUG, message)
         android.util.Log.d("CarneliaDebug", message)
-        System.out.println("CarneliaDebug: " + message)
+        addEntry(LogLevel.DEBUG, message)
     }
 
     fun error(message: String, throwable: Throwable? = null) {
-        addEntry(LogLevel.ERROR, message)
         android.util.Log.e("CarneliaDebug", message, throwable)
-        System.err.println("CarneliaDebug: " + message)
-        throwable?.printStackTrace()
+        addEntry(LogLevel.ERROR, message)
     }
 
-
-
     private fun addEntry(level: LogLevel, message: String) {
-        if (_logs.size > 1000) {
-            _logs.removeAt(0)
+        val entry = LogEntry(System.currentTimeMillis(), level, message)
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            if (_logs.size >= 300) _logs.removeAt(0)
+            _logs.add(entry)
+        } else {
+            mainHandler.post {
+                if (_logs.size >= 300) _logs.removeAt(0)
+                _logs.add(entry)
+            }
         }
-        _logs.add(LogEntry(System.currentTimeMillis(), level, message))
     }
     
     fun getFormattedTime(timestamp: Long): String {

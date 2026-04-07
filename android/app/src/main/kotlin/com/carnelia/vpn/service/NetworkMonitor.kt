@@ -13,19 +13,23 @@ import com.carnelia.vpn.data.ServerRepository
 import com.carnelia.vpn.core.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class NetworkMonitor(private val context: Context) {
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     fun startMonitoring() {
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
 
-        connectivityManager.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
+        val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 super.onAvailable(network)
                 AppLogger.log("NetworkMonitor: Network available")
@@ -36,7 +40,17 @@ class NetworkMonitor(private val context: Context) {
                 super.onLost(network)
                 AppLogger.log("NetworkMonitor: Network lost")
             }
-        })
+        }
+        networkCallback = callback
+        connectivityManager.registerNetworkCallback(request, callback)
+    }
+
+    fun stopMonitoring() {
+        networkCallback?.let {
+            try { connectivityManager.unregisterNetworkCallback(it) } catch (_: Exception) {}
+        }
+        networkCallback = null
+        scope.cancel()
     }
 
     private fun checkAndConnect(network: Network) {
@@ -73,6 +87,7 @@ class NetworkMonitor(private val context: Context) {
             val repository = ServerRepository(context)
             val lastServer = repository.getLastUsedServer()
             if (lastServer != null) {
+                AppLogger.log("NetworkMonitor: triggerVpn → proto=${lastServer.protocol.name} name='${lastServer.name}'")
                 val intent = Intent(context, CarheliaVpnService::class.java)
                 intent.action = CarheliaVpnService.ACTION_CONNECT
                 intent.putExtra(CarheliaVpnService.EXTRA_CONFIG, lastServer)

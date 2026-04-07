@@ -80,6 +80,7 @@ class OutlineVpnProtocol : IVpnProtocol {
                     val port = config.port
                     
                     // Create Outline Config JSON
+                    // Go/mobile shadowsocks client expects "method" as cipher field.
                     val jsonConfig = JSONObject()
                     jsonConfig.put("host", host as Any)
                     jsonConfig.put("port", port)
@@ -120,7 +121,9 @@ class OutlineVpnProtocol : IVpnProtocol {
                          
                     } catch (e: Exception) {
                          AppLogger.error("OutlineVpnProtocol: Tun2socks init failed", e)
-                         // Fallback or error
+                        updateConnectionState(ConnectionState.ERROR)
+                        stop()
+                        return@launch
                     }
                 }
                

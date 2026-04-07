@@ -26,6 +26,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,11 +44,13 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.ui.draw.scale
 import com.carnelia.vpn.core.VpnGlobalState
 import com.carnelia.vpn.ui.theme.CarheliaTheme
 import com.carnelia.vpn.utils.AppLogger
 import com.carnelia.vpn.utils.LogLevel
 import com.carnelia.vpn.utils.PrefsManager
+import kotlinx.coroutines.launch
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -92,7 +96,11 @@ enum class SettingsPage {
     AUTO_CONNECT,
     TUNNEL,
     LANGUAGE,
-    DONATION
+    DONATION,
+    SUBSCRIPTIONS,
+    DOUBLE_TUNNEL,
+    NOISE_MODE,
+    TRAFFIC_MAP
 }
 
 @Composable
@@ -124,6 +132,10 @@ fun SettingsScreen() {
                                 SettingsPage.TUNNEL -> stringResource(R.string.tunnel_settings_section)
                                 SettingsPage.LANGUAGE -> stringResource(R.string.language_title)
                                 SettingsPage.DONATION -> stringResource(R.string.donation_section_title)
+                                SettingsPage.SUBSCRIPTIONS -> stringResource(R.string.subscriptions_title)
+                                SettingsPage.DOUBLE_TUNNEL -> stringResource(R.string.double_tunnel_title)
+                                SettingsPage.NOISE_MODE -> stringResource(R.string.noise_mode_title)
+                                SettingsPage.TRAFFIC_MAP -> stringResource(R.string.traffic_map_title)
                             },  
                             color = MaterialTheme.colorScheme.onSurface
                         ) 
@@ -170,6 +182,10 @@ fun SettingsScreen() {
                     SettingsPage.TUNNEL -> TunnelSettings(context)
                     SettingsPage.LANGUAGE -> LanguageSettings(context) { currentScreen = SettingsPage.MAIN }
                     SettingsPage.DONATION -> DonationSettings(context)
+                    SettingsPage.SUBSCRIPTIONS -> SubscriptionsSettings(context)
+                    SettingsPage.DOUBLE_TUNNEL -> DoubleTunnelSettings(context)
+                    SettingsPage.NOISE_MODE -> NoiseModeSettings(context)
+                    SettingsPage.TRAFFIC_MAP -> com.carnelia.vpn.ui.TrafficMapScreen(context)
                 }
             }
         }
@@ -209,6 +225,27 @@ fun MainSettingsMenu(
             description = stringResource(R.string.netshield_title) + ", " + stringResource(R.string.kill_switch_internal),
             onClick = { onNavigate(SettingsPage.SECURITY) }
         )
+
+        SettingsCategoryItem(
+            icon = Icons.Default.AccountTree,
+            title = stringResource(R.string.double_tunnel_title),
+            description = stringResource(R.string.double_tunnel_desc),
+            onClick = { onNavigate(SettingsPage.DOUBLE_TUNNEL) }
+        )
+
+        SettingsCategoryItem(
+            icon = Icons.Default.BlurOn,
+            title = stringResource(R.string.noise_mode_title),
+            description = stringResource(R.string.noise_mode_desc),
+            onClick = { onNavigate(SettingsPage.NOISE_MODE) }
+        )
+
+        SettingsCategoryItem(
+            icon = Icons.Default.Hub,
+            title = stringResource(R.string.traffic_map_title),
+            description = stringResource(R.string.traffic_map_subtitle),
+            onClick = { onNavigate(SettingsPage.TRAFFIC_MAP) }
+        )
         
         SettingsCategoryItem(
             icon = Icons.Default.Wifi,
@@ -221,6 +258,13 @@ fun MainSettingsMenu(
             icon = Icons.Default.Bolt,
             title = stringResource(R.string.smart_auto_connect_title),
             onClick = { onNavigate(SettingsPage.AUTO_CONNECT) }
+        )
+
+        SettingsCategoryItem(
+            icon = Icons.Default.Subscriptions,
+            title = stringResource(R.string.subscriptions_title),
+            description = stringResource(R.string.subscriptions_desc),
+            onClick = { onNavigate(SettingsPage.SUBSCRIPTIONS) }
         )
 
         SettingsCategoryItem(
@@ -403,7 +447,7 @@ fun TunnelSettings(context: Context) {
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         
         Text(
-            text = "Mux & Protocols",
+            text = stringResource(R.string.mux_protocols_title),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -477,7 +521,7 @@ fun TunnelSettings(context: Context) {
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "Connectivity",
+            text = stringResource(R.string.connectivity_title),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -609,12 +653,25 @@ fun AppearanceSettings(themeIndex: Int, onThemeChange: (Int) -> Unit) {
 @Composable
 fun SecuritySettings(context: Context) {
     var netShieldEnabled by remember { mutableStateOf(PrefsManager.isNetShieldEnabled(context)) }
-    var secureKeyCheckEnabled by remember { mutableStateOf(PrefsManager.isSecureKeyCheckEnabled(context)) }
     var killSwitch by remember { mutableStateOf(PrefsManager.isKillSwitchEnabled(context)) }
+    var fallbackEnabled by remember { mutableStateOf(PrefsManager.isFallbackEnabled(context)) }
 
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         
-        // NetShield
+        // Fallback Auto-switch
+        ToggleCard(
+            title = stringResource(R.string.fallback_title),
+            description = stringResource(R.string.fallback_desc),
+            checked = fallbackEnabled,
+            onCheckedChange = {
+                fallbackEnabled = it
+                PrefsManager.setFallbackEnabled(context, it)
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // AdGuard DNS (NetShield)
         ToggleCard(
             title = stringResource(R.string.netshield_title),
             description = stringResource(R.string.netshield_desc),
@@ -626,20 +683,6 @@ fun SecuritySettings(context: Context) {
             }
         )
         
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Secure Key Check
-        ToggleCard(
-            title = stringResource(R.string.secure_key_title),
-            description = stringResource(R.string.secure_key_desc),
-            checked = secureKeyCheckEnabled,
-            onCheckedChange = { 
-                secureKeyCheckEnabled = it
-                PrefsManager.setSecureKeyCheckEnabled(context, it)
-                VpnGlobalState.isSecureKeyCheckEnabled = it
-            }
-        )
-
         Spacer(modifier = Modifier.height(12.dp))
 
         // Internal Kill Switch
@@ -811,26 +854,12 @@ fun DropdownSettingItem(
 @Composable
 fun ConnectionSettings(context: Context) {
     // State
-    var bypassRu by remember { mutableStateOf(PrefsManager.isBypassRuEnabled(context)) }
     var splitTunneling by remember { mutableStateOf(PrefsManager.isSplitTunnelingEnabled(context)) }
     var splitTunnelMode by remember { mutableStateOf(PrefsManager.getSplitTunnelMode(context)) }
     var dnsServer by remember { mutableStateOf(PrefsManager.getDnsServer(context)) }
 
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         
-        // Smart Routing (Bypass RU)
-        ToggleCard(
-            title = stringResource(R.string.smart_routing_title),
-            description = stringResource(R.string.smart_routing_summary),
-            checked = bypassRu,
-            onCheckedChange = { 
-                bypassRu = it 
-                PrefsManager.setBypassRuEnabled(context, it)
-            }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Split Tunneling
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -973,9 +1002,21 @@ fun CensorshipBypassSettings(context: Context) {
     var stealthModeEnabled by remember { mutableStateOf(PrefsManager.isStealthModeEnabled(context)) }
     var fragEnabled by remember { mutableStateOf(PrefsManager.isFragmentationEnabled(context)) }
     var fragMode by remember { mutableStateOf(PrefsManager.getFragmentationMode(context)) }
+    
+    // Custom Frag Values
+    var customPackets by remember { mutableStateOf(PrefsManager.getFragmentPackets(context)) }
+    var customLength by remember { mutableStateOf(PrefsManager.getFragmentLength(context)) }
+    var customInterval by remember { mutableStateOf(PrefsManager.getFragmentInterval(context)) }
 
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         
+        Text(
+            text = stringResource(R.string.advanced_anti_dpi_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
         // Stealth Mode
         ToggleCard(
             title = stringResource(R.string.stealth_mode_title),
@@ -989,54 +1030,8 @@ fun CensorshipBypassSettings(context: Context) {
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        // Tor Settings
-        var useInternalTor by remember { mutableStateOf(PrefsManager.isUseInternalTor(context)) }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.tor_integration_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface 
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // Use Internal Binary vs External Orbot
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (useInternalTor) stringResource(R.string.tor_internal_title) else stringResource(R.string.tor_external_title),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (useInternalTor) stringResource(R.string.tor_internal_desc) else stringResource(R.string.tor_external_desc),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Switch(
-                        checked = useInternalTor,
-                        onCheckedChange = { 
-                            useInternalTor = it
-                            PrefsManager.setUseInternalTor(context, it)
-                        }
-                    )
-                }
-            }
-        }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Fragmentation
+        // Fragmentation (Expanded)
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier.fillMaxWidth()
@@ -1049,7 +1044,7 @@ fun CensorshipBypassSettings(context: Context) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(stringResource(R.string.fragmentation_title), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.fragmentation_summary), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.frag_desc_text), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(
                         checked = fragEnabled,
@@ -1065,35 +1060,76 @@ fun CensorshipBypassSettings(context: Context) {
                 }
                 
                 if (fragEnabled) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Mode Selection
+                    Text(stringResource(R.string.frag_mode_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    val modes = listOf("light" to stringResource(R.string.frag_mode_light), "balanced" to stringResource(R.string.frag_mode_balanced), "aggressive" to stringResource(R.string.frag_mode_aggressive), "custom" to stringResource(R.string.custom_params_title))
+                    
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Preset Buttons
-                        Button(
-                            onClick = {
-                                fragMode = "balanced"
-                                PrefsManager.setFragmentationMode(context, "balanced")
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == "balanced") MaterialTheme.colorScheme.primary else Color(0xFF333333))
-                        ) { Text(stringResource(R.string.frag_mode_balanced), fontSize = 10.sp) }
+                        modes.forEach { (key, label) ->
+                             Button(
+                                onClick = {
+                                    fragMode = key
+                                    PrefsManager.setFragmentationMode(context, key)
+                                    // Refresh custom values from prefs if switching back from preset
+                                    if (key != "custom") {
+                                        customPackets = PrefsManager.getFragmentPackets(context)
+                                        customLength = PrefsManager.getFragmentLength(context)
+                                        customInterval = PrefsManager.getFragmentInterval(context)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == key) MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                            ) { 
+                                Text(label, fontSize = 10.sp, maxLines = 1) 
+                            }
+                        }
+                    }
 
-                        Button(
-                            onClick = {
-                                fragMode = "aggressive"
-                                PrefsManager.setFragmentationMode(context, "aggressive")
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == "aggressive") MaterialTheme.colorScheme.primary else Color(0xFF333333))
-                        ) { Text(stringResource(R.string.frag_mode_aggressive), fontSize = 10.sp) }
+                    if (fragMode == "custom") {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(16.dp))
                         
-                        Button(
-                            onClick = {
-                                fragMode = "light"
-                                PrefsManager.setFragmentationMode(context, "light")
+                        Text(stringResource(R.string.custom_params_title), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = customPackets,
+                            onValueChange = { 
+                                customPackets = it
+                                PrefsManager.setFragmentPackets(context, it)
                             },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == "light") MaterialTheme.colorScheme.primary else Color(0xFF333333))
-                        ) { Text(stringResource(R.string.frag_mode_light), fontSize = 10.sp) }
+                            label = { Text(stringResource(R.string.frag_packets_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = customLength,
+                            onValueChange = { 
+                                customLength = it
+                                PrefsManager.setFragmentLength(context, it)
+                            },
+                            label = { Text(stringResource(R.string.frag_length_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = customInterval,
+                            onValueChange = { 
+                                customInterval = it
+                                PrefsManager.setFragmentInterval(context, it)
+                            },
+                            label = { Text(stringResource(R.string.frag_interval_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
                     }
                 }
             }
@@ -1355,4 +1391,373 @@ fun ToggleCard(
 @Composable
 fun LogViewerDialog(onDismiss: () -> Unit) { // Kept for reference, though moved to separate activity mostly
     // ... logic same as before if needed, but we now use LogsActivity
+}
+
+@Composable
+fun SubscriptionsSettings(context: Context) {
+    val scope = rememberCoroutineScope()
+    val subManager = remember { com.carnelia.vpn.data.SubscriptionManager(context) }
+    var subscriptions by remember { mutableStateOf(subManager.getSubscriptions()) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var newSubName by remember { mutableStateOf("") }
+    var newSubUrl by remember { mutableStateOf("") }
+    var updatingId by remember { mutableStateOf<String?>(null) }
+
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text(stringResource(R.string.add_subscription_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newSubName,
+                        onValueChange = { newSubName = it },
+                        label = { Text(stringResource(R.string.subscription_name_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newSubUrl,
+                        onValueChange = { newSubUrl = it },
+                        label = { Text(stringResource(R.string.subscription_url_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = newSubName.trim().ifBlank { newSubUrl.trim() }
+                    val url = newSubUrl.trim()
+                    if (url.isNotBlank()) {
+                        subManager.addSubscription(name, url)
+                        subscriptions = subManager.getSubscriptions()
+                        scope.launch {
+                            val id = subscriptions.firstOrNull { it.url == url }?.id
+                            if (id != null) subManager.updateSubscription(id)
+                            subscriptions = subManager.getSubscriptions()
+                        }
+                    }
+                    newSubName = ""; newSubUrl = ""; showAddDialog = false
+                }) { Text(stringResource(R.string.add_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { newSubName = ""; newSubUrl = ""; showAddDialog = false }) {
+                    Text(stringResource(R.string.cancel_action))
+                }
+            }
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Button(
+            onClick = { showAddDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.add_subscription_title), color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        if (subscriptions.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.no_subscriptions_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(subscriptions) { sub ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(sub.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(
+                                    "${sub.serverCount} servers",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (updatingId == sub.id) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                IconButton(onClick = {
+                                    updatingId = sub.id
+                                    scope.launch {
+                                        subManager.updateSubscription(sub.id)
+                                        subscriptions = subManager.getSubscriptions()
+                                        updatingId = null
+                                    }
+                                }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            IconButton(onClick = {
+                                subManager.removeSubscription(sub.id)
+                                subscriptions = subManager.getSubscriptions()
+                            }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Double Tunnel Settings ───────────────────────────────────────────────────
+
+@Composable
+fun DoubleTunnelSettings(context: Context) {
+    val repository = remember { com.carnelia.vpn.data.ServerRepository(context) }
+    var enabled by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.isDoubleTunnelEnabled(context)) }
+    var selectedServerId by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.getDoubleTunnelServerId(context)) }
+    var showPicker by remember { mutableStateOf(false) }
+
+    val allServers = remember { repository.getServers() }
+    val activeServer = remember { repository.getLastUsedServer() }
+    val candidateServers = remember(allServers, activeServer) {
+        allServers.filter { it.id != activeServer?.id }
+    }
+    val selectedName = remember(selectedServerId, candidateServers) {
+        candidateServers.find { it.id == selectedServerId }?.name
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Warning card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.double_tunnel_warning),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Enable toggle
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.double_tunnel_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.double_tunnel_desc), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { v ->
+                        enabled = v
+                        com.carnelia.vpn.utils.PrefsManager.setDoubleTunnelEnabled(context, v)
+                    }
+                )
+            }
+        }
+
+        if (enabled) {
+            Spacer(Modifier.height(16.dp))
+
+            // First server label (current active)
+            Text(
+                stringResource(R.string.double_tunnel_first_server),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(4.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Language, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(activeServer?.name ?: stringResource(R.string.no_server_selected), color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Second server selector
+            Text(
+                stringResource(R.string.double_tunnel_second_server),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(4.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showPicker = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.VpnLock, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        selectedName ?: stringResource(R.string.double_tunnel_not_selected),
+                        modifier = Modifier.weight(1f),
+                        color = if (selectedName != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+
+    // Server picker dialog
+    if (showPicker) {
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text(stringResource(R.string.double_tunnel_select)) },
+            text = {
+                LazyColumn {
+                    items(candidateServers) { server ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedServerId = server.id
+                                    com.carnelia.vpn.utils.PrefsManager.setDoubleTunnelServerId(context, server.id)
+                                    showPicker = false
+                                }
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = server.id == selectedServerId,
+                                onClick = null
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(server.name, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPicker = false }) {
+                    Text(stringResource(R.string.cancel_action))
+                }
+            }
+        )
+    }
+}
+
+// ─── Noise Mode Settings ──────────────────────────────────────────────────────
+
+@Composable
+fun NoiseModeSettings(context: Context) {
+    var enabled by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.isNoiseModeEnabled(context)) }
+    var intensity by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.getNoiseModeIntensity(context)) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Enable toggle
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.noise_mode_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.noise_mode_desc), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { v ->
+                        enabled = v
+                        com.carnelia.vpn.utils.PrefsManager.setNoiseModeEnabled(context, v)
+                        if (!v) com.carnelia.vpn.core.NoiseModeManager.stop()
+                    }
+                )
+            }
+        }
+
+        if (enabled) {
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                stringResource(R.string.noise_intensity_label),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(8.dp))
+
+            listOf(
+                "low" to R.string.noise_low,
+                "medium" to R.string.noise_medium,
+                "high" to R.string.noise_high
+            ).forEach { (value, labelRes) ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (intensity == value)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clickable {
+                            intensity = value
+                            com.carnelia.vpn.utils.PrefsManager.setNoiseModeIntensity(context, value)
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = intensity == value,
+                            onClick = null
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(labelRes),
+                            color = if (intensity == value)
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

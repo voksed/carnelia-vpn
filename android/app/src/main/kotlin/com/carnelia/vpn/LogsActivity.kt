@@ -48,7 +48,7 @@ class LogsActivity : ComponentActivity() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("CarneliaVPN Logs", logs)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(this, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.logs_copied_toast), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -60,18 +60,18 @@ fun LogsScreen(onBack: () -> Unit, onCopy: () -> Unit, onClear: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Application Logs") },
+                title = { Text(stringResource(R.string.log_viewer_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.manual_entry_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = onCopy) {
-                        Icon(Icons.Default.Share, contentDescription = "Copy")
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.copy_to_clipboard))
                     }
                     IconButton(onClick = onClear) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.clear_history))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -87,14 +87,9 @@ fun LogsScreen(onBack: () -> Unit, onCopy: () -> Unit, onClear: () -> Unit) {
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(8.dp),
-            reverseLayout = true // Show newest at bottom usually, or top? Standard is newest at bottom for terminals, but list usually adds to end.
-            // AppLogger adds to end. So reverseLayout=true shows newest at bottom if we scroll there?
-            // Actually, if we want newest at top, we just iterate normally if we add to beginning.
-            // AppLogger adds to end: `_logs.add`.
-            // So newest is at end.
-            // If we want newest at top visually:
+            reverseLayout = true
         ) {
-            items(logs.reversed()) { log ->
+            items(logs) { log ->
                  Text(
                      text = "[${AppLogger.getFormattedTime(log.timestamp)}] ${log.level}: ${log.message}",
                      color = when(log.level) {

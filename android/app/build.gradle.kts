@@ -11,10 +11,9 @@ android {
         applicationId = "com.carnelia.vpn"
         minSdk = 26
         targetSdk = 34
-        versionCode = 24 // Incremented for v2
-        versionName = "2.0"
-        
-        setProperty("archivesBaseName", "CarneliaVPN_v${versionName}")
+        versionCode = 27
+        versionName = "2.3.0"
+        setProperty("archivesBaseName", "CarneliaVPN_v2.3.0")
     }
 
     signingConfigs {
@@ -26,9 +25,23 @@ android {
         }
     }
 
+    flavorDimensions += "edition"
+
+    productFlavors {
+        create("vanilla") {
+            dimension = "edition"
+            buildConfigField("boolean", "WALLET_ENABLED", "false")
+        }
+        create("wallet") {
+            dimension = "edition"
+            buildConfigField("boolean", "WALLET_ENABLED", "true")
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -39,11 +52,23 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // Only package arm64-v8a — covers 99% of modern Android devices
+    // Reduces APK size by eliminating armeabi-v7a/x86/x86_64 from AAR libs (vpnLib, tun2socks)
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
+        }
     }
 
     kotlinOptions {
@@ -63,12 +88,19 @@ android {
         }
         resources {
             excludes.add("META-INF/native-image/**")
-            pickFirst("go/**") // Resolve Go class conflict
-            pickFirst("go/Seq.class")
-            pickFirst("go/Seq$*.class")
-            pickFirst("go/Universe.class")
-            pickFirst("go/Universe$*.class")
-            pickFirst("go/error.class")
+            excludes.add("META-INF/*.kotlin_module")
+            excludes.add("META-INF/DEPENDENCIES")
+            excludes.add("META-INF/LICENSE*")
+            excludes.add("META-INF/NOTICE*")
+            excludes.add("DebugProbesKt.bin")
+            excludes.add("kotlin-tooling-metadata.json")
+            // Resolve Go class conflict
+            pickFirsts.add("go/**")
+            pickFirsts.add("go/Seq.class")
+            pickFirsts.add("go/Seq$*.class")
+            pickFirsts.add("go/Universe.class")
+            pickFirsts.add("go/Universe$*.class")
+            pickFirsts.add("go/error.class")
         }
     }
 }
@@ -100,24 +132,10 @@ dependencies {
 
     implementation("androidx.lifecycle:lifecycle-runtime:2.6.1")
     
-    // DataStore for settings persistence
-    implementation("androidx.datastore:datastore-preferences:1.0.0")
+    // DataStore for settings persistence — removed (VpnConfigRepository unused, using SharedPreferences)
 
     // VPN & Networking
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
-    
-    // Tor Android (Allows running Tor without Orbit)
-    implementation("info.guardianproject:tor-android:0.4.6.10") 
-    implementation("info.guardianproject:jtorctl:0.4")
-    
-    // I2P Android Client Helper
-    implementation("net.i2p.android:helper:0.9.5")
-
-    // Outline VPN SDK (when available)
-    // implementation("org.outline:outline-android:1.0.0")
-    
-    // WireGuard Android
-    // implementation("com.wireguard.android:tunnel:1.0.20231115")
 
     // JSON serialization
     implementation("com.google.code.gson:gson:2.10.1")
@@ -135,8 +153,6 @@ dependencies {
 
     // Logging
     implementation("com.google.code.findbugs:jsr305:3.0.2")
-    implementation("androidx.work:work-runtime-ktx:2.8.1")
-    implementation("androidx.webkit:webkit:1.9.0")
 
     // Testing
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.0")
@@ -145,4 +161,12 @@ dependencies {
     // QR Code
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.google.zxing:core:3.5.2")
+
+    // TON Wallet — TweetNaCl bundled as source (com.iwebpp.crypto.TweetNaclFast)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06") // EncryptedSharedPreferences
+    // Image loading for NFT / Jetton icons
+    implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // OSM tile map
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 }

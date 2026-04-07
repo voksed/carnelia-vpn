@@ -239,6 +239,7 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
         } catch(e: Exception) {
              AppLogger.error("XrayVpnProtocol: Stop error", e)
         }
+        scope.cancel()
         updateConnectionState(ConnectionState.DISCONNECTED)
     }
     
@@ -288,18 +289,18 @@ class XrayVpnProtocol(private val context: Context) : IVpnProtocol {
     
     private fun startStatsLoop() {
         scope.launch {
+             val uid = android.os.Process.myUid()
              while (isRunning) {
                  try {
-                     // Get total traffic as proxy
-                     val rx = android.net.TrafficStats.getTotalRxBytes()
-                     val tx = android.net.TrafficStats.getTotalTxBytes()
+                     val rx = android.net.TrafficStats.getUidRxBytes(uid)
+                     val tx = android.net.TrafficStats.getUidTxBytes(uid)
                      if (rx != bytesReceived || tx != bytesSent) {
                         bytesReceived = rx
                         bytesSent = tx
                         bytesListeners.forEach { it(bytesSent, bytesReceived) }
                      }
                  } catch (e: Exception) {}
-                 delay(1000)
+                 delay(2000)
              }
         }
     }
