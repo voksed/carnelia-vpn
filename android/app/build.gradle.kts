@@ -7,13 +7,15 @@ android {
     compileSdk = 34
     namespace = "com.carnelia.vpn"
 
+    val targetAbi = (project.findProperty("targetAbi") as String?)?.trim()
+
     defaultConfig {
         applicationId = "com.carnelia.vpn"
         minSdk = 26
         targetSdk = 34
-        versionCode = 27
-        versionName = "2.3.0"
-        setProperty("archivesBaseName", "CarneliaVPN_v2.3.0")
+        versionCode = 28
+        versionName = "2.4.0"
+        setProperty("archivesBaseName", "CarneliaVPN_v2.4.0")
     }
 
     signingConfigs {
@@ -40,8 +42,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false // ОТКЛЮЧЕНО для диагностики R8
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -60,14 +62,30 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // Only package arm64-v8a — covers 99% of modern Android devices
-    // Reduces APK size by eliminating armeabi-v7a/x86/x86_64 from AAR libs (vpnLib, tun2socks)
+    // By default we build two APKs for the most common Android ABIs.
+    // You can override with -PtargetAbi=arm64-v8a or -PtargetAbi=armeabi-v7a.
     splits {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a")
+            when (targetAbi) {
+                "arm64-v8a" -> include("arm64-v8a")
+                "armeabi-v7a" -> include("armeabi-v7a")
+                null, "" -> include("arm64-v8a", "armeabi-v7a")
+                else -> throw GradleException("Unsupported targetAbi: $targetAbi")
+            }
             isUniversalApk = false
+        }
+    }
+
+    // Отключаем очистку папки release при сборке APK
+    tasks.whenTaskAdded {
+        if (name.startsWith("clean") || name.contains("Clean")) return@whenTaskAdded
+        if (name.contains("assemble") && name.contains("Release")) {
+            doFirst {
+                println("[INFO] Сборка без очистки папки release. Все APK сохраняются.")
+            }
+            outputs.upToDateWhen { false }
         }
     }
 
@@ -169,4 +187,7 @@ dependencies {
 
     // OSM tile map
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+
+    // Biometric lock (v2.4.0)
+    implementation("androidx.biometric:biometric:1.1.0")
 }

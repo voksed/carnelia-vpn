@@ -339,4 +339,61 @@ object PrefsManager {
 
     fun setBlockedDomains(context: Context, domains: Set<String>) =
         getPrefs(context).edit().putStringSet(KEY_BLOCKED_DOMAINS, domains).apply()
+
+    // ==================== v2.4.0 ====================
+
+    // Biometric / PIN lock
+    private const val KEY_BIOMETRIC_LOCK = "biometric_lock_enabled"
+    fun isBiometricLockEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_BIOMETRIC_LOCK, false)
+    fun setBiometricLockEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply()
+
+    // ==================== v2.4.0: Network Boost ====================
+
+    // Dual Network: keep cellular active while on WiFi
+    private const val KEY_DUAL_NETWORK = "dual_network_enabled"
+    fun isDualNetworkEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_DUAL_NETWORK, false)
+    fun setDualNetworkEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_DUAL_NETWORK, enabled).apply()
+
+    // Smart Port Selection: auto-probe ports to bypass restrictive networks
+    private const val KEY_SMART_PORT = "smart_port_enabled"
+    fun isSmartPortEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SMART_PORT, false)
+    fun setSmartPortEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_SMART_PORT, enabled).apply()
+
+    // Port Hopping: switch to a new port every N minutes (for servers supporting port ranges)
+    private const val KEY_PORT_HOPPING = "port_hopping_enabled"
+    private const val KEY_PORT_HOPPING_RANGE = "port_hopping_range" // e.g. "10000-20000"
+    private const val KEY_PORT_HOPPING_INTERVAL = "port_hopping_interval_min" // minutes
+    fun isPortHoppingEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_PORT_HOPPING, false)
+    fun setPortHoppingEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_PORT_HOPPING, enabled).apply()
+    fun getPortHoppingRange(context: Context): String = getPrefs(context).getString(KEY_PORT_HOPPING_RANGE, "10000-20000") ?: "10000-20000"
+    fun setPortHoppingRange(context: Context, range: String) = getPrefs(context).edit().putString(KEY_PORT_HOPPING_RANGE, range).apply()
+    fun getPortHoppingInterval(context: Context): Int = getPrefs(context).getInt(KEY_PORT_HOPPING_INTERVAL, 5)
+    fun setPortHoppingInterval(context: Context, minutes: Int) = getPrefs(context).edit().putInt(KEY_PORT_HOPPING_INTERVAL, minutes).apply()
+
+    // HTTP Camouflage: disguise VPN traffic as normal HTTPS browsing
+    // Uses xray httpupgrade / websocket transport with a fake Host header
+    private const val KEY_HTTP_CAMOUFLAGE = "http_camouflage_enabled"
+    private const val KEY_HTTP_CAMOUFLAGE_HOST = "http_camouflage_host"
+    fun isHttpCamouflageEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_HTTP_CAMOUFLAGE, false)
+    fun setHttpCamouflageEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_HTTP_CAMOUFLAGE, enabled).apply()
+    fun getHttpCamouflageHost(context: Context): String = getPrefs(context).getString(KEY_HTTP_CAMOUFLAGE_HOST, "www.google.com") ?: "www.google.com"
+    fun setHttpCamouflageHost(context: Context, host: String) = getPrefs(context).edit().putString(KEY_HTTP_CAMOUFLAGE_HOST, host).apply()
+
+    // VPN Schedule
+    private const val KEY_SCHEDULE_ENABLED = "schedule_enabled"
+    private const val KEY_SCHEDULE_CONNECT_H = "schedule_connect_h"
+    private const val KEY_SCHEDULE_CONNECT_M = "schedule_connect_m"
+    private const val KEY_SCHEDULE_DISCONNECT_H = "schedule_disconnect_h"
+    private const val KEY_SCHEDULE_DISCONNECT_M = "schedule_disconnect_m"
+
+    fun isScheduleEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SCHEDULE_ENABLED, false)
+    fun setScheduleEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(KEY_SCHEDULE_ENABLED, enabled).apply()
+    fun getScheduleConnectHour(context: Context): Int = getPrefs(context).getInt(KEY_SCHEDULE_CONNECT_H, 9)
+    fun setScheduleConnectHour(context: Context, h: Int) = getPrefs(context).edit().putInt(KEY_SCHEDULE_CONNECT_H, h).apply()
+    fun getScheduleConnectMin(context: Context): Int = getPrefs(context).getInt(KEY_SCHEDULE_CONNECT_M, 0)
+    fun setScheduleConnectMin(context: Context, m: Int) = getPrefs(context).edit().putInt(KEY_SCHEDULE_CONNECT_M, m).apply()
+    fun getScheduleDisconnectHour(context: Context): Int = getPrefs(context).getInt(KEY_SCHEDULE_DISCONNECT_H, 18)
+    fun setScheduleDisconnectHour(context: Context, h: Int) = getPrefs(context).edit().putInt(KEY_SCHEDULE_DISCONNECT_H, h).apply()
+    fun getScheduleDisconnectMin(context: Context): Int = getPrefs(context).getInt(KEY_SCHEDULE_DISCONNECT_M, 0)
+    fun setScheduleDisconnectMin(context: Context, m: Int) = getPrefs(context).edit().putInt(KEY_SCHEDULE_DISCONNECT_M, m).apply()
 }

@@ -44,6 +44,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import com.carnelia.vpn.core.VpnGlobalState
 import com.carnelia.vpn.ui.theme.CarheliaTheme
@@ -100,7 +101,11 @@ enum class SettingsPage {
     SUBSCRIPTIONS,
     DOUBLE_TUNNEL,
     NOISE_MODE,
-    TRAFFIC_MAP
+    TRAFFIC_MAP,
+    BACKUP,
+    SCHEDULE,
+    NETWORK_BOOST,
+    AUTO_TUNE
 }
 
 @Composable
@@ -136,6 +141,10 @@ fun SettingsScreen() {
                                 SettingsPage.DOUBLE_TUNNEL -> stringResource(R.string.double_tunnel_title)
                                 SettingsPage.NOISE_MODE -> stringResource(R.string.noise_mode_title)
                                 SettingsPage.TRAFFIC_MAP -> stringResource(R.string.traffic_map_title)
+                                SettingsPage.BACKUP -> stringResource(R.string.backup_section_title)
+                                SettingsPage.SCHEDULE -> stringResource(R.string.schedule_title)
+                                SettingsPage.NETWORK_BOOST -> stringResource(R.string.network_boost_title)
+                                SettingsPage.AUTO_TUNE -> "Авто-Калибровка"
                             },  
                             color = MaterialTheme.colorScheme.onSurface
                         ) 
@@ -179,13 +188,17 @@ fun SettingsScreen() {
                     SettingsPage.CONNECTION -> ConnectionSettings(context)
                     SettingsPage.CENSORSHIP_BYPASS -> CensorshipBypassSettings(context)
                     SettingsPage.AUTO_CONNECT -> AutoConnectSettings(context)
-                    SettingsPage.TUNNEL -> TunnelSettings(context)
+                    SettingsPage.TUNNEL -> TunnelSettings(context, onNavigate = { page -> currentScreen = page })
+                    SettingsPage.AUTO_TUNE -> com.carnelia.vpn.ui.AutoTuneScreen(context)
                     SettingsPage.LANGUAGE -> LanguageSettings(context) { currentScreen = SettingsPage.MAIN }
                     SettingsPage.DONATION -> DonationSettings(context)
                     SettingsPage.SUBSCRIPTIONS -> SubscriptionsSettings(context)
                     SettingsPage.DOUBLE_TUNNEL -> DoubleTunnelSettings(context)
                     SettingsPage.NOISE_MODE -> NoiseModeSettings(context)
                     SettingsPage.TRAFFIC_MAP -> com.carnelia.vpn.ui.TrafficMapScreen(context)
+                    SettingsPage.BACKUP -> BackupSettings(context)
+                    SettingsPage.SCHEDULE -> ScheduleSettings(context)
+                    SettingsPage.NETWORK_BOOST -> NetworkBoostSettings(context)
                 }
             }
         }
@@ -275,6 +288,27 @@ fun MainSettingsMenu(
         )
 
         SettingsCategoryItem(
+            icon = Icons.Default.NetworkCheck,
+            title = stringResource(R.string.network_boost_title),
+            description = stringResource(R.string.network_boost_desc),
+            onClick = { onNavigate(SettingsPage.NETWORK_BOOST) }
+        )
+
+        SettingsCategoryItem(
+            icon = Icons.Default.SaveAlt,
+            title = stringResource(R.string.backup_section_title),
+            description = stringResource(R.string.backup_desc),
+            onClick = { onNavigate(SettingsPage.BACKUP) }
+        )
+
+        SettingsCategoryItem(
+            icon = Icons.Default.Schedule,
+            title = stringResource(R.string.schedule_title),
+            description = stringResource(R.string.schedule_desc),
+            onClick = { onNavigate(SettingsPage.SCHEDULE) }
+        )
+
+        SettingsCategoryItem(
             icon = Icons.Default.Favorite,
             title = stringResource(R.string.donate_dev_title),
             description = stringResource(R.string.donate_dev_desc),
@@ -282,7 +316,7 @@ fun MainSettingsMenu(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
-        HorizontalDivider(color = Color(0xFF2C2C2C))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(modifier = Modifier.height(24.dp))
 
         // --- Other Items (Language, Report, Logs) ---
@@ -443,7 +477,7 @@ fun SettingsCategoryItem(
 }
 
 @Composable
-fun TunnelSettings(context: Context) {
+fun TunnelSettings(context: Context, onNavigate: (SettingsPage) -> Unit = {}) {
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         
         Text(
@@ -517,7 +551,7 @@ fun TunnelSettings(context: Context) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(color = Color(0xFF2C2C2C))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
@@ -573,6 +607,63 @@ fun TunnelSettings(context: Context) {
                 PrefsManager.setAppAutoStartEnabled(context, autoStart)
             }
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Auto-Calibration banner
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            ),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNavigate(SettingsPage.AUTO_TUNE) }
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoFixHigh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Авто-Калибровка",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Подобрать идеальный MUX и фрагментацию под ваш сервер",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -655,6 +746,7 @@ fun SecuritySettings(context: Context) {
     var netShieldEnabled by remember { mutableStateOf(PrefsManager.isNetShieldEnabled(context)) }
     var killSwitch by remember { mutableStateOf(PrefsManager.isKillSwitchEnabled(context)) }
     var fallbackEnabled by remember { mutableStateOf(PrefsManager.isFallbackEnabled(context)) }
+    var biometricLock by remember { mutableStateOf(PrefsManager.isBiometricLockEnabled(context)) }
 
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         
@@ -693,6 +785,19 @@ fun SecuritySettings(context: Context) {
             onCheckedChange = { 
                 killSwitch = it 
                 PrefsManager.setKillSwitchEnabled(context, it)
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Biometric Lock
+        ToggleCard(
+            title = stringResource(R.string.biometric_lock_title),
+            description = stringResource(R.string.biometric_lock_desc),
+            checked = biometricLock,
+            onCheckedChange = {
+                biometricLock = it
+                PrefsManager.setBiometricLockEnabled(context, it)
             }
         )
 
@@ -944,7 +1049,7 @@ fun ConnectionSettings(context: Context) {
                             PrefsManager.setDnsServer(context, "8.8.8.8")
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "8.8.8.8") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "8.8.8.8") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                     ) { Text("Google", fontSize = 10.sp) }
                     
                     Button(
@@ -953,7 +1058,7 @@ fun ConnectionSettings(context: Context) {
                             PrefsManager.setDnsServer(context, "1.1.1.1")
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "1.1.1.1") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "1.1.1.1") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                     ) { Text("Cloudflare", fontSize = 10.sp) }
                 }
 
@@ -967,7 +1072,7 @@ fun ConnectionSettings(context: Context) {
                             PrefsManager.setDnsServer(context, "94.140.14.14")
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "94.140.14.14") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "94.140.14.14") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                     ) { Text("AdGuard", fontSize = 10.sp) }
                     
                     Button(
@@ -976,7 +1081,7 @@ fun ConnectionSettings(context: Context) {
                             PrefsManager.setDnsServer(context, "9.9.9.9")
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "9.9.9.9") MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                        colors = ButtonDefaults.buttonColors(containerColor = if (dnsServer == "9.9.9.9") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                     ) { Text("Quad9", fontSize = 10.sp) }
                 }
 
@@ -1083,7 +1188,7 @@ fun CensorshipBypassSettings(context: Context) {
                                 },
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(0.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == key) MaterialTheme.colorScheme.primary else Color(0xFF333333))
+                                colors = ButtonDefaults.buttonColors(containerColor = if (fragMode == key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                             ) { 
                                 Text(label, fontSize = 10.sp, maxLines = 1) 
                             }
@@ -1172,7 +1277,7 @@ fun AutoConnectSettings(context: Context) {
                     )
                 }
                 
-                HorizontalDivider(color = Color(0xFF333333), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
                 
                 // On Wi-Fi
                  Row(
@@ -1197,7 +1302,7 @@ fun AutoConnectSettings(context: Context) {
                     )
                 }
                 
-                HorizontalDivider(color = Color(0xFF333333), thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
 
                 // On Mobile
                  Row(
@@ -1246,7 +1351,7 @@ fun LanguageSettings(context: Context, onLanguageSelected: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge
                 )
-                HorizontalDivider(color = Color(0xFF2C2C2C))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Text(
                     "Русский", 
                     modifier = Modifier
@@ -1317,7 +1422,7 @@ fun DonationSettings(context: Context) {
                  
                  Box(
                      modifier = Modifier
-                         .background(Color(0xFF222222), RoundedCornerShape(8.dp))
+                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                          .padding(12.dp)
                          .clickable {
                              val clip = android.content.ClipData.newPlainText("TON Address", tonAddress)
@@ -1329,7 +1434,7 @@ fun DonationSettings(context: Context) {
                          text = tonAddress,
                          fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                          fontSize = 12.sp,
-                         color = Color.LightGray,
+                         color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.8f),
                          textAlign = androidx.compose.ui.text.style.TextAlign.Center
                      )
                  }
@@ -1362,7 +1467,7 @@ fun ToggleCard(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -1759,5 +1864,367 @@ fun NoiseModeSettings(context: Context) {
                 }
             }
         }
+    }
+}
+
+// ─── Backup & Restore Settings ────────────────────────────────────────────────
+@Composable
+fun BackupSettings(context: Context) {
+    var message by remember { mutableStateOf<String?>(null) }
+
+    Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+        Text(
+            stringResource(R.string.backup_desc),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                val result = com.carnelia.vpn.data.BackupManager.exportToClipboard(context)
+                message = if (result != null) context.getString(R.string.backup_exported)
+                          else context.getString(R.string.backup_nothing_to_export)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+        ) {
+            Icon(Icons.Default.SaveAlt, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.backup_export))
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = {
+                val count = com.carnelia.vpn.data.BackupManager.importFromClipboard(context)
+                message = if (count > 0) context.getString(R.string.backup_imported, count)
+                          else context.getString(R.string.backup_import_error)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Icon(Icons.Default.ContentPaste, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.backup_import), color = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+
+        message?.let { msg ->
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(msg, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+// ─── Schedule Settings ────────────────────────────────────────────────────────
+@Composable
+fun ScheduleSettings(context: Context) {
+    var enabled by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.isScheduleEnabled(context)) }
+    var connectHour by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.getScheduleConnectHour(context)) }
+    var connectMin by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.getScheduleConnectMin(context)) }
+    var disconnectHour by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.getScheduleDisconnectHour(context)) }
+    var disconnectMin by remember { mutableStateOf(com.carnelia.vpn.utils.PrefsManager.getScheduleDisconnectMin(context)) }
+
+    fun saveAndUpdate() {
+        com.carnelia.vpn.utils.PrefsManager.setScheduleEnabled(context, enabled)
+        com.carnelia.vpn.utils.PrefsManager.setScheduleConnectHour(context, connectHour)
+        com.carnelia.vpn.utils.PrefsManager.setScheduleConnectMin(context, connectMin)
+        com.carnelia.vpn.utils.PrefsManager.setScheduleDisconnectHour(context, disconnectHour)
+        com.carnelia.vpn.utils.PrefsManager.setScheduleDisconnectMin(context, disconnectMin)
+        com.carnelia.vpn.service.VpnScheduleManager.updateSchedule(context)
+    }
+
+    Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+        ToggleCard(
+            title = stringResource(R.string.schedule_enabled),
+            description = stringResource(R.string.schedule_desc),
+            checked = enabled,
+            onCheckedChange = { enabled = it; saveAndUpdate() }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Connect time
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(stringResource(R.string.schedule_connect_at), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NumberPickerItem(
+                        title = "H",
+                        value = connectHour,
+                        range = 0..23,
+                        onValueChange = { connectHour = it; saveAndUpdate() }
+                    )
+                    Text(":", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium)
+                    NumberPickerItem(
+                        title = "M",
+                        value = connectMin,
+                        range = 0..59,
+                        onValueChange = { connectMin = it; saveAndUpdate() }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Disconnect time
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(stringResource(R.string.schedule_disconnect_at), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NumberPickerItem(
+                        title = "H",
+                        value = disconnectHour,
+                        range = 0..23,
+                        onValueChange = { disconnectHour = it; saveAndUpdate() }
+                    )
+                    Text(":", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium)
+                    NumberPickerItem(
+                        title = "M",
+                        value = disconnectMin,
+                        range = 0..59,
+                        onValueChange = { disconnectMin = it; saveAndUpdate() }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                stringResource(R.string.schedule_note),
+                modifier = Modifier.padding(12.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+// ============================================================
+//  v2.4.0 — Network Boost Settings
+// ============================================================
+@Composable
+fun NetworkBoostSettings(context: Context) {
+    var dualNet by remember { mutableStateOf(PrefsManager.isDualNetworkEnabled(context)) }
+    var smartPort by remember { mutableStateOf(PrefsManager.isSmartPortEnabled(context)) }
+    var portHopping by remember { mutableStateOf(PrefsManager.isPortHoppingEnabled(context)) }
+    var portHoppingRange by remember { mutableStateOf(PrefsManager.getPortHoppingRange(context)) }
+    var portHoppingInterval by remember { mutableStateOf(PrefsManager.getPortHoppingInterval(context).toString()) }
+    var httpCamouflage by remember { mutableStateOf(PrefsManager.isHttpCamouflageEnabled(context)) }
+    var camouflageHost by remember { mutableStateOf(PrefsManager.getHttpCamouflageHost(context)) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        // ── Section: Private Network Bypass ───────────────────────
+        Text(
+            text = stringResource(R.string.private_network_bypass_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                // Smart Port
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.smart_port_title), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.smart_port_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = smartPort,
+                        onCheckedChange = {
+                            smartPort = it
+                            PrefsManager.setSmartPortEnabled(context, it)
+                        }
+                    )
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                // Port Hopping
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.port_hopping_title), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.port_hopping_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = portHopping,
+                        onCheckedChange = {
+                            portHopping = it
+                            PrefsManager.setPortHoppingEnabled(context, it)
+                        }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = portHopping,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = portHoppingRange,
+                            onValueChange = {
+                                portHoppingRange = it
+                                PrefsManager.setPortHoppingRange(context, it)
+                            },
+                            label = { Text(stringResource(R.string.port_hopping_range_label)) },
+                            placeholder = { Text("10000-20000") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = portHoppingInterval,
+                            onValueChange = { v ->
+                                portHoppingInterval = v
+                                v.toIntOrNull()?.let { PrefsManager.setPortHoppingInterval(context, it) }
+                            },
+                            label = { Text(stringResource(R.string.port_hopping_interval_label)) },
+                            placeholder = { Text("5") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                // HTTP Camouflage
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.http_camouflage_title), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.http_camouflage_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = httpCamouflage,
+                        onCheckedChange = {
+                            httpCamouflage = it
+                            PrefsManager.setHttpCamouflageEnabled(context, it)
+                        }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = httpCamouflage,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    OutlinedTextField(
+                        value = camouflageHost,
+                        onValueChange = {
+                            camouflageHost = it
+                            PrefsManager.setHttpCamouflageHost(context, it)
+                        },
+                        label = { Text(stringResource(R.string.http_camouflage_host_label)) },
+                        placeholder = { Text("www.google.com") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // ── Section: Dual Network Speed Boost ─────────────────────
+        Text(
+            text = stringResource(R.string.dual_network_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.dual_network_title), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.dual_network_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = dualNet,
+                        onCheckedChange = {
+                            dualNet = it
+                            PrefsManager.setDualNetworkEnabled(context, it)
+                        }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = dualNet,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.dual_network_note),
+                            modifier = Modifier.padding(10.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
     }
 }

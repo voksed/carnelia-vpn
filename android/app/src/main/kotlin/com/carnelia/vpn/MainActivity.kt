@@ -1,9 +1,10 @@
-﻿package com.carnelia.vpn
+package com.carnelia.vpn
 
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,15 +48,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import com.carnelia.vpn.ui.theme.AppTheme
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 
 import android.graphics.Bitmap
@@ -69,14 +74,18 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.foundation.Image
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.result.ActivityResultLauncher
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var vpnManager: VpnManager
+
+    // Biometric lock state (v2.4.0)
+    private val isAuthenticated = androidx.compose.runtime.mutableStateOf(false)
 
     // QR Code Scanner Launcher
     private val qrCodeLauncher = registerForActivityResult(ScanContract()) { result ->
@@ -108,8 +117,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         vpnManager = VpnManager(this)
 
+        // v2.4.0: Biometric / PIN lock
+        if (PrefsManager.isBiometricLockEnabled(this)) {
+            launchBiometricPrompt()
+        } else {
+            isAuthenticated.value = true
+        }
+
         setContent {
             val context = LocalContext.current
+            val authenticated by isAuthenticated
             var themeIndex by remember { mutableStateOf(PrefsManager.getThemeIndex(context)) }
             
             val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -125,14 +142,21 @@ class MainActivity : ComponentActivity() {
 
             CarheliaTheme(themeIndex = themeIndex) {
                 val currentTheme = AppTheme.values().getOrElse(themeIndex) { AppTheme.CARNELIA }
-                
+
+                if (!authenticated) {
+                    // Lock screen � biometric prompt is shown on top automatically
+                    androidx.compose.material3.Surface(
+                        modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {}
+                } else {
                 CarheliaApp(
-                    vpnManager, 
-                    ::startVpn, 
+                    vpnManager,
+                    ::startVpn,
                     ::stopVpn,
                     ::switchVpn,
-                    currentTheme, 
-                    onScanQr = { 
+                    currentTheme,
+                    onScanQr = {
                         val options = ScanOptions()
                         options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                         options.setPrompt("Scan VPN QR Code")
@@ -143,13 +167,14 @@ class MainActivity : ComponentActivity() {
                         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clipData = clipboard.primaryClip
                         if (clipData != null && clipData.itemCount > 0) {
-                            val text = clipData.getItemAt(0).text.toString()
+                            val text = clipData.getItemAt(0).coerceToText(this).toString()
                             importConfig(text)
                         } else {
                             Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
+                } // end auth check
             }
         }
     }
@@ -198,6 +223,39 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         vpnManager.destroy()
     }
+
+    private fun launchBiometricPrompt() {
+        val biometricManager = androidx.biometric.BiometricManager.from(this)
+        val canAuth = biometricManager.canAuthenticate(
+            androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        )
+        if (canAuth != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
+            // Biometric/PIN not configured on device � skip lock
+            isAuthenticated.value = true
+            return
+        }
+        val executor = androidx.core.content.ContextCompat.getMainExecutor(this)
+        val callback = object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
+                isAuthenticated.value = true
+            }
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                // User cancelled or too many attempts � close the app
+                finish()
+            }
+        }
+        val prompt = androidx.biometric.BiometricPrompt(this, executor, callback)
+        val info = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+            .setTitle(getString(R.string.biometric_prompt_title))
+            .setSubtitle(getString(R.string.biometric_prompt_subtitle))
+            .setAllowedAuthenticators(
+                androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+        prompt.authenticate(info)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -244,6 +302,56 @@ fun CarheliaApp(
 
     if (showShareDialog && shareContent.isNotEmpty()) {
         QrCodeDialog(content = shareContent, onDismiss = { showShareDialog = false })
+    }
+
+    // Security Threat Dialog
+    val app = context.applicationContext as? com.carnelia.vpn.CarheliaApplication
+    var showSecurityDialog by remember {
+        mutableStateOf(app?.detectedThreats?.isNotEmpty() == true)
+    }
+    if (showSecurityDialog && app != null) {
+        val threats = app.detectedThreats
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showSecurityDialog = false },
+            icon = {
+                androidx.compose.material3.Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = androidx.compose.ui.graphics.Color(0xFFFF6B35)
+                )
+            },
+            title = {
+                androidx.compose.material3.Text(
+                    "?? ������ ������������ (${threats.size})",
+                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                androidx.compose.foundation.lazy.LazyColumn {
+                    items(threats.size) { i ->
+                        val threat = threats[i]
+                        androidx.compose.foundation.layout.Column(
+                            modifier = androidx.compose.ui.Modifier.padding(bottom = 12.dp)
+                        ) {
+                            androidx.compose.material3.Text(
+                                text = threat.title,
+                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                                color = androidx.compose.ui.graphics.Color(0xFFFF6B35)
+                            )
+                            androidx.compose.material3.Text(
+                                text = threat.description,
+                                style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { showSecurityDialog = false }) {
+                    androidx.compose.material3.Text("�������, ����������")
+                }
+            }
+        )
     }
     
     // Server Selection Dialog
@@ -294,8 +402,8 @@ fun CarheliaApp(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = Color(0xFF1A1A1A),
-                drawerContentColor = Color.White
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerContentColor = MaterialTheme.colorScheme.onSurface
             ) {
                 Spacer(Modifier.height(24.dp))
                 Text(
@@ -304,7 +412,7 @@ fun CarheliaApp(
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = Color(0xFF333333))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.height(16.dp))
                 
                 // Settings
@@ -315,11 +423,11 @@ fun CarheliaApp(
                         context.startActivity(Intent(context, SettingsActivity::class.java))
                         scope.launch { drawerState.close() }
                     },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White) },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface) },
                     modifier = Modifier.padding(horizontal = 12.dp),
                     colors = NavigationDrawerItemDefaults.colors(
                         unselectedContainerColor = Color.Transparent,
-                        unselectedTextColor = Color.White
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
 
@@ -331,11 +439,27 @@ fun CarheliaApp(
                         context.startActivity(Intent(context, GeoSpoofActivity::class.java))
                         scope.launch { drawerState.close() }
                     },
-                    icon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.White) },
+                    icon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface) },
                     modifier = Modifier.padding(horizontal = 12.dp),
                     colors = NavigationDrawerItemDefaults.colors(
                         unselectedContainerColor = Color.Transparent,
-                        unselectedTextColor = Color.White
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                // Standalone Tools
+                NavigationDrawerItem(
+                    label = { Text(stringResource(R.string.tools_title)) },
+                    selected = false,
+                    onClick = {
+                        context.startActivity(Intent(context, StandaloneToolsActivity::class.java))
+                        scope.launch { drawerState.close() }
+                    },
+                    icon = { Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedContainerColor = Color.Transparent,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             }
@@ -348,11 +472,15 @@ fun CarheliaApp(
                 TopAppBar(
                     title = {
                         Text(
-                            text = if (currentTheme == AppTheme.TON) stringResource(R.string.ton_vpn_title) else stringResource(R.string.carnelia_vpn_title),
+                            text = when (currentTheme) {
+                                AppTheme.TON -> stringResource(R.string.ton_vpn_title)
+                                AppTheme.SECRET -> stringResource(R.string.voks_vpn_title)
+                                else -> stringResource(R.string.carnelia_vpn_title)
+                            },
                             fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 2.sp,
-                            color = if (currentTheme == AppTheme.TON) Color(0xFF0088CC) else Color(0xFFFF1744)
+                            color = MaterialTheme.colorScheme.primary
                         )
                     },
                     navigationIcon = {
@@ -360,7 +488,7 @@ fun CarheliaApp(
                             Icon(
                                 Icons.Default.Menu,
                                 contentDescription = "Menu",
-                                tint = if (currentTheme == AppTheme.TON) Color(0xFF0088CC) else Color(0xFFFF1744)
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     },
@@ -372,24 +500,24 @@ fun CarheliaApp(
                                 shareContent = "${activeConfig?.protocol?.name?.lowercase()}://${activeConfig?.host}:${activeConfig?.port}" 
                                 showShareDialog = true
                             }) {
-                                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_tooltip), tint = Color.White)
+                                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_tooltip), tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(0xFF0A0A0A)
+                        containerColor = MaterialTheme.colorScheme.background
                     ),
                     modifier = Modifier.shadow(elevation = 8.dp)
                 )
             },
-            containerColor = Color(0xFF0A0A0A)
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = listOf(Color(0xFF1A1A1A), Color(0xFF0A0A0A))
+                            colors = listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background)
                         )
                     )
                     .padding(paddingValues)
@@ -416,12 +544,12 @@ fun CarheliaApp(
                             ConnectionState.CONNECTED -> Color(0xFF00FF00)
                             ConnectionState.RECONNECTING -> Color(0xFFFFAA00)
                             ConnectionState.ERROR -> Color(0xFFFF1744)
-                            else -> Color.Gray
+                            else -> MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f)
                         },
                         letterSpacing = 1.sp
                     )
                     if (connectionState == ConnectionState.CONNECTED) {
-                        Text(text = connectionDuration, fontSize = 24.sp, fontWeight = FontWeight.Light, color = Color.White, modifier = Modifier.padding(top = 8.dp))
+                        Text(text = connectionDuration, fontSize = 24.sp, fontWeight = FontWeight.Light, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 8.dp))
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
@@ -435,10 +563,9 @@ fun CarheliaApp(
                             .background(
                                 brush = Brush.radialGradient(
                                     colors = if (connectionState == ConnectionState.CONNECTED) {
-                                         if (currentTheme == AppTheme.TON) listOf(Color(0xFF0088CC), Color(0xFF003D5C))
-                                         else listOf(Color(0xFFFF1744), Color(0xFFB71C1C))
+                                         listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
                                     } else {
-                                        listOf(Color(0xFF2C2C2C), Color(0xFF1A1A1A))
+                                        listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface)
                                     }
                                 )
                             )
@@ -460,14 +587,14 @@ fun CarheliaApp(
                             imageVector = Icons.Default.PowerSettingsNew,
                             contentDescription = "Connect",
                             modifier = Modifier.size(80.dp),
-                            tint = Color.White.copy(alpha = if(connectionState == ConnectionState.CONNECTED) 1f else 0.5f)
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if(connectionState == ConnectionState.CONNECTED) 1f else 0.5f)
                         )
                          Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .border(4.dp, 
-                                    if (connectionState == ConnectionState.CONNECTED) Color.White.copy(alpha=0.2f)
-                                    else Color.White.copy(alpha=0.1f), 
+                                    if (connectionState == ConnectionState.CONNECTED) MaterialTheme.colorScheme.onSurface.copy(alpha=0.2f)
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha=0.1f), 
                                     CircleShape
                                 )
                          )
@@ -481,12 +608,12 @@ fun CarheliaApp(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                          Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                             Icon(Icons.Default.ArrowDownward, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
-                             Text(formatBytes(stats.bytesReceived), color = Color.White, fontSize = 12.sp)
+                             Icon(Icons.Default.ArrowDownward, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f), modifier = Modifier.size(16.dp))
+                             Text(formatBytes(stats.bytesReceived), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                          }
                          Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                             Icon(Icons.Default.ArrowUpward, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
-                             Text(formatBytes(stats.bytesSent), color = Color.White, fontSize = 12.sp)
+                             Icon(Icons.Default.ArrowUpward, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f), modifier = Modifier.size(16.dp))
+                             Text(formatBytes(stats.bytesSent), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                          }
                     }
 
@@ -496,8 +623,8 @@ fun CarheliaApp(
                     Surface(
                          onClick = { showServerList = true },
                          shape = RoundedCornerShape(50),
-                         color = Color(0xFF1F1F1F),
-                         border = BorderStroke(1.dp, Color(0xFF333333)),
+                         color = MaterialTheme.colorScheme.surfaceVariant,
+                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                          modifier = Modifier.height(56.dp).fillMaxWidth().padding(bottom = 16.dp)
                     ) {
                         Row(
@@ -511,10 +638,10 @@ fun CarheliaApp(
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 activeConfig?.name ?: stringResource(R.string.select_server_btn),
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
-                            Icon(Icons.Default.KeyboardArrowUp, null, tint = Color.Gray)
+                            Icon(Icons.Default.KeyboardArrowUp, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
                         }
                     }
                 }
@@ -526,11 +653,11 @@ fun CarheliaApp(
 @Composable
 fun StatBox(label: String, value: String, currentTheme: AppTheme) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Text(
             label, 
             fontSize = 11.sp, 
-            color = if (currentTheme == AppTheme.TON) Color(0xFF0088CC) else Color(0xFFCC0000), 
+            color = MaterialTheme.colorScheme.primary, 
             fontWeight = FontWeight.Bold, 
             letterSpacing = 1.sp
         )
@@ -552,13 +679,13 @@ fun QrCodeDialog(content: String, onDismiss: () -> Unit) {
         Card(
             modifier = Modifier.padding(16.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.onSurface)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(stringResource(R.string.scan_to_import), style = MaterialTheme.typography.titleMedium, color = Color.Black)
+                Text(stringResource(R.string.scan_to_import), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 val bitmap = remember(content) {
@@ -601,9 +728,20 @@ fun ServerSelectionDialog(
     var showManualAdd by remember { mutableStateOf(false) }
     var serverToRename by remember { mutableStateOf<VpnServerConfig?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var renameGroupText by remember { mutableStateOf("") }
     var pingResults by remember { mutableStateOf<Map<String, Int?>>(emptyMap()) }
     var isPinging by remember { mutableStateOf(false) }
+    // v2.4.0: Search & Group filter
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedGroup by remember { mutableStateOf<String?>(null) } // null = All
     val pingScope = rememberCoroutineScope()
+    val allGroups = remember(servers) { servers.mapNotNull { it.group }.distinct().sorted() }
+    val filteredServers = remember(servers, searchQuery, selectedGroup) {
+        servers.filter { server ->
+            (selectedGroup == null || server.group == selectedGroup) &&
+            (searchQuery.isBlank() || server.name.contains(searchQuery, ignoreCase = true) || server.host.contains(searchQuery, ignoreCase = true))
+        }
+    }
 
     fun pingServers(list: List<VpnServerConfig>) {
         if (isPinging) return
@@ -630,37 +768,51 @@ fun ServerSelectionDialog(
     serverToRename?.let { server ->
         AlertDialog(
             onDismissRequest = { serverToRename = null },
-            title = { Text(stringResource(R.string.rename_server_title), color = Color.White) },
+            title = { Text(stringResource(R.string.rename_server_title), color = MaterialTheme.colorScheme.onSurface) },
             text = {
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    label = { Text(stringResource(R.string.rename_server_hint), color = Color.Gray) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = if (currentTheme == AppTheme.TON) Color(0xFF0088CC) else Color(0xFFFF1744),
-                        unfocusedBorderColor = Color(0xFF555555)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = renameText,
+                        onValueChange = { renameText = it },
+                        label = { Text(stringResource(R.string.rename_server_hint), color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
                     )
-                )
+                    OutlinedTextField(
+                        value = renameGroupText,
+                        onValueChange = { renameGroupText = it },
+                        label = { Text(stringResource(R.string.server_group_hint), color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
                     val trimmed = renameText.trim()
                     if (trimmed.isNotBlank()) {
-                        repository.updateServer(server.copy(name = trimmed))
+                        repository.updateServer(server.copy(name = trimmed, group = renameGroupText.trim().ifBlank { null }))
                         servers = repository.getServers()
                     }
                     serverToRename = null
-                }) { Text(stringResource(R.string.save_action), color = if (currentTheme == AppTheme.TON) Color(0xFF0088CC) else Color(0xFFFF1744)) }
+                }) { Text(stringResource(R.string.save_action), color = MaterialTheme.colorScheme.primary) }
             },
             dismissButton = {
                 TextButton(onClick = { serverToRename = null }) {
-                    Text(stringResource(R.string.cancel_action), color = Color.Gray)
+                    Text(stringResource(R.string.cancel_action), color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
                 }
             },
-            containerColor = Color(0xFF1A1A1A)
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 
@@ -679,7 +831,7 @@ fun ServerSelectionDialog(
             Card(
                  modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
                  shape = RoundedCornerShape(24.dp),
-                 colors = CardDefaults.cardColors(containerColor = Color(0xFF121212))
+                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                     // Header
@@ -688,66 +840,118 @@ fun ServerSelectionDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(stringResource(R.string.select_server_btn), style = MaterialTheme.typography.titleLarge, color = Color.White)
+                        Text(stringResource(R.string.select_server_btn), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Auto-Best: pick server with lowest ping
+                            IconButton(
+                                onClick = {
+                                    val bestId = pingResults.entries.filter { it.value != null }.minByOrNull { it.value!! }?.key
+                                    val best = servers.find { it.id == bestId }
+                                    if (best != null) onServerSelected(best)
+                                },
+                                modifier = Modifier.size(32.dp),
+                                enabled = pingResults.any { it.value != null }
+                            ) {
+                                Icon(Icons.Default.Bolt, null,
+                                    tint = if (pingResults.any { it.value != null }) Color(0xFFFFCC00) else MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f),
+                                    modifier = Modifier.size(18.dp))
+                            }
                             if (isPinging) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.Gray)
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
                                 Spacer(Modifier.width(4.dp))
                             } else {
                                 IconButton(onClick = { pingServers(servers) }, modifier = Modifier.size(32.dp)) {
-                                    Icon(Icons.Default.Refresh, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f), modifier = Modifier.size(18.dp))
                                 }
                             }
                             IconButton(onClick = onDismiss) {
-                                Icon(Icons.Default.Close, null, tint = Color.Gray)
+                                Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
                             }
                         }
                     }
                     
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Search field
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text(stringResource(R.string.search_servers_hint), color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+
+                    // Group filter chips
+                    if (allGroups.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            item {
+                                FilterChip(
+                                    selected = selectedGroup == null,
+                                    onClick = { selectedGroup = null },
+                                    label = { Text(stringResource(R.string.filter_all), fontSize = 12.sp) }
+                                )
+                            }
+                            items(allGroups) { g ->
+                                FilterChip(
+                                    selected = selectedGroup == g,
+                                    onClick = { selectedGroup = if (selectedGroup == g) null else g },
+                                    label = { Text(g, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     // Add Tools
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = onImportClipboard,
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222)),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
-                             Icon(Icons.Default.ContentPaste, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                             Icon(Icons.Default.ContentPaste, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                         }
                         Button(
                             onClick = onScanQr,
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222)),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
-                             Icon(Icons.Default.QrCodeScanner, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                             Icon(Icons.Default.QrCodeScanner, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                         }
                         Button(
                             onClick = { showManualAdd = true },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222222)),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
-                             Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                             Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(color = Color(0xFF333333))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // List
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(servers, key = { it.id }) { server ->
+                        items(filteredServers, key = { it.id }) { server ->
                             val isSelected = activeInfo?.id == server.id
                             Card(
                                 onClick = { onServerSelected(server) },
                                 colors = CardDefaults.cardColors(
                                     containerColor = if (isSelected) 
-                                        (if (currentTheme == AppTheme.TON) Color(0xFF003D5C) else Color(0xFF5F0000))
-                                        else Color(0xFF1F1F1F)
+                                        (MaterialTheme.colorScheme.primary)
+                                        else MaterialTheme.colorScheme.surfaceVariant
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -756,17 +960,17 @@ fun ServerSelectionDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(server.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text(server.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                         val pingMs = pingResults[server.id]
                                         val pingText = when {
                                             !pingResults.containsKey(server.id) -> server.host
-                                            pingMs == null -> "✕ timeout"
-                                            pingMs < 100 -> "● ${pingMs}ms"
-                                            pingMs < 300 -> "● ${pingMs}ms"
-                                            else -> "● ${pingMs}ms"
+                                            pingMs == null -> "? timeout"
+                                            pingMs < 100 -> "? ${pingMs}ms"
+                                            pingMs < 300 -> "? ${pingMs}ms"
+                                            else -> "? ${pingMs}ms"
                                         }
                                         val pingColor = when {
-                                            !pingResults.containsKey(server.id) -> Color.Gray
+                                            !pingResults.containsKey(server.id) -> MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f)
                                             pingMs == null -> Color(0xFFFF4444)
                                             pingMs < 100 -> Color(0xFF00CC66)
                                             pingMs < 300 -> Color(0xFFFFAA00)
@@ -779,6 +983,7 @@ fun ServerSelectionDialog(
                                     IconButton(
                                         onClick = {
                                             renameText = server.name
+                                            renameGroupText = server.group ?: ""
                                             serverToRename = server
                                         },
                                         modifier = Modifier.size(32.dp)
@@ -786,7 +991,7 @@ fun ServerSelectionDialog(
                                         Icon(
                                             Icons.Default.Edit,
                                             contentDescription = stringResource(R.string.rename_tooltip),
-                                            tint = Color.Gray.copy(alpha = 0.7f),
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f).copy(alpha = 0.7f),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -802,22 +1007,22 @@ fun ServerSelectionDialog(
                                         Icon(
                                             Icons.Default.Delete, 
                                             contentDescription = "Delete", 
-                                            tint = Color.Gray.copy(alpha = 0.7f),
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f).copy(alpha = 0.7f),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
 
                                     if (isSelected) {
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Icon(Icons.Default.Check, null, tint = Color.White)
+                                        Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.onSurface)
                                     }
                                 }
                             }
                         }
-                        if (servers.isEmpty()) {
+                        if (filteredServers.isEmpty()) {
                             item {
                                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                    Text("No servers found. Add one!", color = Color.Gray)
+                                    Text("No servers found. Add one!", color = MaterialTheme.colorScheme.onSurface.copy(alpha=0.6f))
                                 }
                             }
                         }

@@ -64,7 +64,8 @@ data class VpnServerConfig(
     val password: String? = null,
     val country: String? = null,
     val flag: String? = null,
-    val subscriptionId: String? = null
+    val subscriptionId: String? = null,
+    val group: String? = null         // v2.4.0: optional group/folder name
 ) : Serializable
 
 /**

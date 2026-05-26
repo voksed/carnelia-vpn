@@ -38,13 +38,13 @@ fun ManualEntryDialog(
         Card(
             modifier = Modifier.fillMaxWidth().wrapContentHeight(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(
                     stringResource(R.string.manual_server_entry_title),
                     style = MaterialTheme.typography.titleLarge, 
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -59,8 +59,8 @@ fun ManualEntryDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF0088CC),
                             unfocusedBorderColor = Color.Gray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         maxLines = 5
                     )

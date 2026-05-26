@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong
 import android.service.quicksettings.TileService
 import com.carnelia.vpn.core.TrafficStatsManager
 import com.carnelia.vpn.core.TrafficSession
+import com.carnelia.vpn.core.DualNetworkManager
 
 /**
  * Carnelia VPN Service
@@ -56,6 +57,7 @@ class CarheliaVpnService : VpnService() {
     private var fallbackAttempts: Int = 0
     private val maxFallbackAttempts = 3
     private lateinit var serverRepository: com.carnelia.vpn.data.ServerRepository
+    private lateinit var dualNetworkManager: DualNetworkManager
 
     inner class LocalBinder : Binder() {
         fun getService(): CarheliaVpnService = this@CarheliaVpnService
@@ -66,6 +68,13 @@ class CarheliaVpnService : VpnService() {
         AppLogger.log("Service: onCreate")
         vpnManager = VpnManager(this, scope)
         serverRepository = com.carnelia.vpn.data.ServerRepository(this)
+        dualNetworkManager = DualNetworkManager(this)
+        dualNetworkManager.onNetworksChanged = { networks ->
+            AppLogger.log("Service: DualNetwork changed — ${networks.size} underlying networks")
+            if (currentState == ConnectionState.CONNECTED) {
+                setUnderlyingNetworks(networks.toTypedArray())
+            }
+        }
         setupVpnListeners()
         
         // Start foreground immediately to prevent crash on Android 8+
@@ -205,6 +214,11 @@ class CarheliaVpnService : VpnService() {
                     // Start measuring session duration
                     connectionStartTime.set(System.currentTimeMillis())
                     establishVpnInterface()
+                    // Dual Network (WiFi + Mobile boost)
+                    dualNetworkManager.start()
+                    if (dualNetworkManager.isDualActive()) {
+                        setUnderlyingNetworks(dualNetworkManager.getUnderlyingNetworks())
+                    }
                     // Noise Mode
                     if (PrefsManager.isNoiseModeEnabled(this)) {
                         com.carnelia.vpn.core.NoiseModeManager.start(PrefsManager.getNoiseModeIntensity(this))
@@ -216,6 +230,7 @@ class CarheliaVpnService : VpnService() {
                 }
                 ConnectionState.DISCONNECTED -> {
                     com.carnelia.vpn.core.NoiseModeManager.stop()
+                    dualNetworkManager.stop()
                     closeVpnInterface()
                 }
                 ConnectionState.ERROR -> {
@@ -276,15 +291,28 @@ class CarheliaVpnService : VpnService() {
             
             builder.addAddress("10.111.222.1", 32)
             builder.addRoute("0.0.0.0", 0)
+
+            // IPv6 — capture all IPv6 traffic to prevent leaks outside the tunnel
+            try {
+                builder.addAddress("fd00:cafe:beef::1", 128)
+                builder.addRoute("::", 0)
+            } catch (e: Exception) {
+                AppLogger.log("Service: IPv6 TUN setup skipped: ${e.message}")
+            }
             
             // Ultra-Low Latency DNS configuration (Cloudflare + Quad9)
             // Using closest geo-distributed servers
             val currentDns = PrefsManager.getDnsServer(this)
             if (currentDns.isNotEmpty()) {
-                builder.addDnsServer(currentDns) // User selected
+                try { builder.addDnsServer(currentDns) } catch (_: Exception) {} // User selected
             }
-            // Fallbacks just in case user DNS fails or is empty/invalid
-            if (currentDns != "1.1.1.1") builder.addDnsServer("1.1.1.1")
+            // IPv4 fallback
+            if (currentDns != "1.1.1.1") {
+                try { builder.addDnsServer("1.1.1.1") } catch (_: Exception) {}
+            }
+            // IPv6 DNS — needed when IPv6 route is active
+            try { builder.addDnsServer("2606:4700:4700::1111") } catch (_: Exception) {} // Cloudflare IPv6
+            try { builder.addDnsServer("2001:4860:4860::8888") } catch (_: Exception) {} // Google IPv6
             
             builder.setSession("Carnelia VPN")
             

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Политика сетевой безопасности Carnelia VPN
+    - Запрещён cleartext (HTTP) для всех доменов
+    - TLS обязателен
+    - Исключение: localhost нужен для xray-core локального inbound-прокси
+-->
+<network-security-config>
+
+    <!-- Cleartext полностью запрещён для всех доменов -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Только системные CA-сертификаты; пользовательские CA не доверяются -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Исключение: локальный xray-core inbound (127.0.0.1) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+
+</network-security-config>

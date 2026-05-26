@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.format.DateFormat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -98,6 +102,11 @@ fun StatisticsScreen(onBack: () -> Unit) {
                 UnitTab(stringResource(R.string.unit_gb), selectedUnit == "gb") { selectedUnit = "gb" }
             }
             
+            // Traffic Chart
+            if (history.isNotEmpty()) {
+                TrafficChart(history = history, modifier = Modifier.fillMaxWidth().height(140.dp).padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+
             // Header
             Row(
                 modifier = Modifier
@@ -201,6 +210,71 @@ fun formatData(bytes: Long, mode: String): String {
             } else {
                  String.format("%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
             }
+        }
+    }
+}
+
+@Composable
+fun TrafficChart(history: List<com.carnelia.vpn.core.TrafficSession>, modifier: Modifier = Modifier) {
+    // Group by day (last 7 days)
+    val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val cal = Calendar.getInstance()
+    val days = (6 downTo 0).map { offset ->
+        cal.timeInMillis = System.currentTimeMillis()
+        cal.add(Calendar.DAY_OF_YEAR, -offset)
+        dayFormat.format(cal.time)
+    }
+    val dailyDown = days.map { day ->
+        history.filter { dayFormat.format(Date(it.timestamp)) == day }.sumOf { it.bytesReceived }
+    }
+    val dailyUp = days.map { day ->
+        history.filter { dayFormat.format(Date(it.timestamp)) == day }.sumOf { it.bytesSent }
+    }
+    val maxVal = (dailyDown + dailyUp).maxOrNull()?.toFloat() ?: 1f
+    val downColor = Color(0xFF00E676)
+    val upColor = Color(0xFF2979FF)
+    val gridColor = Color(0xFF333333)
+
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val count = days.size
+        val step = w / (count - 1).coerceAtLeast(1)
+
+        // Draw grid lines
+        for (i in 0..3) {
+            val y = h * i / 3f
+            drawLine(gridColor, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
+        }
+
+        // Draw download line
+        val downPath = Path()
+        dailyDown.forEachIndexed { idx, bytes ->
+            val x = idx * step
+            val y = h - (bytes.toFloat() / maxVal) * h * 0.9f
+            if (idx == 0) downPath.moveTo(x, y) else downPath.lineTo(x, y)
+        }
+        drawPath(downPath, downColor, style = Stroke(width = 3f))
+
+        // Draw upload line
+        val upPath = Path()
+        dailyUp.forEachIndexed { idx, bytes ->
+            val x = idx * step
+            val y = h - (bytes.toFloat() / maxVal) * h * 0.9f
+            if (idx == 0) upPath.moveTo(x, y) else upPath.lineTo(x, y)
+        }
+        drawPath(upPath, upColor, style = Stroke(width = 3f))
+
+        // Dots
+        dailyDown.forEachIndexed { idx, bytes ->
+            val x = idx * step
+            val y = h - (bytes.toFloat() / maxVal) * h * 0.9f
+            drawCircle(downColor, radius = 4f, center = Offset(x, y))
+        }
+        dailyUp.forEachIndexed { idx, bytes ->
+            val x = idx * step
+            val y = h - (bytes.toFloat() / maxVal) * h * 0.9f
+            drawCircle(upColor, radius = 4f, center = Offset(x, y))
         }
     }
 }

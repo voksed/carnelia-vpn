@@ -334,4 +334,90 @@ Android: %2$s
     <string name="tor_external_title">Внешнее приложение Orbot</string>
     <string name="tor_internal_desc">Автономно. Выше расход батареи.</string>
     <string name="tor_external_desc">Маршрутизация через Orbot. Требуется установка.</string>
+
+    <!-- v2.4.0: Health Checker / Search -->
+    <string name="auto_best_server">Лучший автоматически</string>
+    <string name="search_servers_hint">Поиск серверов…</string>
+
+    <!-- v2.4.0: Backup & Restore -->
+    <string name="backup_section_title">Резервная копия</string>
+    <string name="backup_desc">Сохранение и восстановление конфигурации серверов</string>
+    <string name="backup_export">Экспортировать</string>
+    <string name="backup_import">Импорт из буфера обмена</string>
+    <string name="backup_exported">Резервная копия скопирована в буфер обмена</string>
+    <string name="backup_imported">Импортировано серверов: %1$d</string>
+    <string name="backup_import_error">Ошибка импорта — неверный формат</string>
+    <string name="backup_nothing_to_export">Нет серверов для экспорта</string>
+
+    <!-- v2.4.0: Server Groups -->
+    <string name="server_group_hint">Название группы (оставьте пустым для Default)</string>
+    <string name="filter_all">Все</string>
+
+    <!-- v2.4.0: Network Boost -->
+    <string name="network_boost_title">УЛУЧШЕНИЕ СЕТИ</string>
+    <string name="network_boost_desc">Умный порт, двойная сеть, прыжки по портам</string>
+
+    <!-- Sub-sections -->
+    <string name="private_network_bypass_section">ОБХОД ЧАСТНЫХ СЕТЕЙ</string>
+    <string name="dual_network_section">ДВОЙНАЯ СЕТЬ (Wi-Fi + Мобильный)</string>
+
+    <!-- Smart Port -->
+    <string name="smart_port_title">Умный выбор порта</string>
+    <string name="smart_port_desc">Автоматически определяет открытые порты для обхода гостиничных, корпоративных и каптивных сетей</string>
+
+    <!-- Port Hopping -->
+    <string name="port_hopping_title">Прыжки по портам</string>
+    <string name="port_hopping_desc">Периодически меняет порт в заданном диапазоне — обходит временные блокировки DPI</string>
+    <string name="port_hopping_range_label">Диапазон портов (например 10000–20000)</string>
+    <string name="port_hopping_interval_label">Интервал (минуты)</string>
+
+    <!-- HTTP Camouflage -->
+    <string name="http_camouflage_title">HTTP-маскировка</string>
+    <string name="http_camouflage_desc">Делает VPN-трафик похожим на обычный HTTPS, добавляя поддельный заголовок Host</string>
+    <string name="http_camouflage_host_label">Поддельный хост (SNI)</string>
+
+    <!-- Dual Network -->
+    <string name="dual_network_title">Wi-Fi + Мобильный буст</string>
+    <string name="dual_network_desc">Удерживает мобильные данные активными вместе с Wi-Fi для резерва и ускорения</string>
+    <string name="dual_network_note">Android будет поддерживать одновременное подключение по Wi-Fi и мобильному интернету. VPN-туннель использует более быструю сеть в каждый момент. Полезно в местах с нестабильным Wi-Fi.</string>
+
+    <!-- v2.4.0: Standalone Tools -->
+    <string name="tools_title">Сетевые инструменты</string>
+
+    <!-- DNS Protection -->
+    <string name="dns_protection_section">ЗАЩИТА DNS</string>
+    <string name="dns_only_title">Только DNS-режим</string>
+    <string name="dns_only_desc">Шифрует и фильтрует DNS-запросы без полного VPN. Работает в любой сети.</string>
+    <string name="dns_only_active">Активен — %1$s DNS</string>
+    <string name="dns_vpn_permission_needed">Сначала дайте разрешение VPN, затем попробуйте снова</string>
+    <string name="custom_dns_ip_label">Свой IP DNS</string>
+    <string name="open_private_dns_settings">Открыть системные настройки Private DNS</string>
+
+    <!-- Network Boost standalone -->
+    <string name="network_boost_section_standalone">УЛУЧШЕНИЕ СЕТИ</string>
+    <string name="dual_network_standalone_title">Wi-Fi + Мобильный буст</string>
+    <string name="dual_network_standalone_desc">Держит мобильные данные активными вместе с Wi-Fi для резерва и ускорения</string>
+    <string name="dual_network_standalone_active">Оба интерфейса активны — Android выбирает более быстрый</string>
+
+    <!-- Network Info -->
+    <string name="network_info_section">ИНФОРМАЦИЯ О СЕТИ</string>
+    <string name="dns_ping_title">Задержка DNS-серверов</string>
+
+    <!-- v2.4.0: Biometric Lock -->
+    <string name="biometric_lock_title">Биометрическая / PIN-блокировка</string>
+    <string name="biometric_lock_desc">Требовать отпечаток пальца или PIN для открытия приложения</string>
+    <string name="biometric_prompt_title">Carnelia VPN</string>
+    <string name="biometric_prompt_subtitle">Пройдите аутентификацию для продолжения</string>
+
+    <!-- v2.4.0: VPN Schedule -->
+    <string name="schedule_title">Расписание VPN</string>
+    <string name="schedule_desc">Авто-подключение и отключение по времени</string>
+    <string name="schedule_enabled">Включить расписание</string>
+    <string name="schedule_connect_at">Подключить в</string>
+    <string name="schedule_disconnect_at">Отключить в</string>
+    <string name="schedule_note">Расписание срабатывает ежедневно в указанное время. Приложение должно быть открыто хотя бы один раз.</string>
+
+    <!-- v2.4.0: Traffic Chart -->
+    <string name="traffic_chart_title">Трафик по дням</string>
+    <string name="traffic_chart_no_data">Подключитесь для сбора данных</string>
 </resources>

@@ -61,7 +61,7 @@ fun DAppBrowserScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = Color.White)
+                        Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = MaterialTheme.colorScheme.onSurface)
                     }
                     OutlinedTextField(
                         value = urlInputText,
@@ -85,7 +85,7 @@ fun DAppBrowserScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF0098EA),
                             unfocusedBorderColor = Color(0xFF333355),
-                            focusedTextColor = Color.White,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = Color.Gray,
                             cursorColor = Color(0xFF0098EA)
                         ),

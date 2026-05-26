@@ -332,4 +332,90 @@ Last Error: %5$s
     <string name="traffic_high">High</string>
     <string name="traffic_map_vpn_node">VPN</string>
     <string name="traffic_map_no_traffic">No traffic data yet</string>
+
+    <!-- v2.4.0: Health Checker / Search -->
+    <string name="auto_best_server">Auto Best</string>
+    <string name="search_servers_hint">Search servers…</string>
+
+    <!-- v2.4.0: Backup & Restore -->
+    <string name="backup_section_title">Backup &amp; Restore</string>
+    <string name="backup_desc">Save and restore your server configurations</string>
+    <string name="backup_export">Export Backup</string>
+    <string name="backup_import">Import from Clipboard</string>
+    <string name="backup_exported">Backup copied to clipboard</string>
+    <string name="backup_imported">Imported %1$d servers</string>
+    <string name="backup_import_error">Failed to import backup — invalid format</string>
+    <string name="backup_nothing_to_export">No servers to export</string>
+
+    <!-- v2.4.0: Server Groups -->
+    <string name="server_group_hint">Group name (leave empty for Default)</string>
+    <string name="filter_all">All</string>
+
+    <!-- v2.4.0: Network Boost -->
+    <string name="network_boost_title">NETWORK BOOST</string>
+    <string name="network_boost_desc">Smart Port, Dual Network, Port Hopping</string>
+
+    <!-- Sub-sections -->
+    <string name="private_network_bypass_section">PRIVATE NETWORK BYPASS</string>
+    <string name="dual_network_section">DUAL NETWORK (WiFi + Mobile)</string>
+
+    <!-- Smart Port -->
+    <string name="smart_port_title">Smart Port Selection</string>
+    <string name="smart_port_desc">Auto-detects open ports to bypass hotel, corporate or captive-portal firewalls</string>
+
+    <!-- Port Hopping -->
+    <string name="port_hopping_title">Port Hopping</string>
+    <string name="port_hopping_desc">Periodically switches to a random port in a range — defeats DPI time-based detection</string>
+    <string name="port_hopping_range_label">Port range (e.g. 10000–20000)</string>
+    <string name="port_hopping_interval_label">Interval (minutes)</string>
+
+    <!-- HTTP Camouflage -->
+    <string name="http_camouflage_title">HTTP Camouflage</string>
+    <string name="http_camouflage_desc">Makes VPN traffic look like regular HTTPS by injecting a fake Host header</string>
+    <string name="http_camouflage_host_label">Fake Host (SNI)</string>
+
+    <!-- Dual Network -->
+    <string name="dual_network_title">WiFi + Mobile Boost</string>
+    <string name="dual_network_desc">Keeps cellular active alongside Wi-Fi for fallback and speed improvement</string>
+    <string name="dual_network_note">Android will maintain both Wi-Fi and mobile data connections simultaneously. The VPN tunnel uses whichever network has lower latency at any given moment. Useful in areas with unstable Wi-Fi.</string>
+
+    <!-- v2.4.0: Standalone Tools -->
+    <string name="tools_title">Network Tools</string>
+
+    <!-- DNS Protection -->
+    <string name="dns_protection_section">DNS PROTECTION</string>
+    <string name="dns_only_title">DNS-Only Mode</string>
+    <string name="dns_only_desc">Encrypt &amp; filter DNS queries without a full VPN. Works on any network.</string>
+    <string name="dns_only_active">Active — %1$s DNS</string>
+    <string name="dns_vpn_permission_needed">Grant VPN permission first, then try again</string>
+    <string name="custom_dns_ip_label">Custom DNS IP</string>
+    <string name="open_private_dns_settings">Open System Private DNS Settings</string>
+
+    <!-- Network Boost standalone -->
+    <string name="network_boost_section_standalone">NETWORK BOOST</string>
+    <string name="dual_network_standalone_title">WiFi + Mobile Boost</string>
+    <string name="dual_network_standalone_desc">Keep mobile data active alongside Wi-Fi for fallback and speed</string>
+    <string name="dual_network_standalone_active">Both interfaces active — Android auto-selects faster path</string>
+
+    <!-- Network Info -->
+    <string name="network_info_section">NETWORK INFO</string>
+    <string name="dns_ping_title">DNS Server Latency</string>
+
+    <!-- v2.4.0: Biometric Lock -->
+    <string name="biometric_lock_title">Biometric / PIN Lock</string>
+    <string name="biometric_lock_desc">Require fingerprint or PIN to open the app</string>
+    <string name="biometric_prompt_title">Carnelia VPN</string>
+    <string name="biometric_prompt_subtitle">Authenticate to continue</string>
+
+    <!-- v2.4.0: VPN Schedule -->
+    <string name="schedule_title">VPN Schedule</string>
+    <string name="schedule_desc">Auto connect and disconnect by time</string>
+    <string name="schedule_enabled">Enable Schedule</string>
+    <string name="schedule_connect_at">Connect at</string>
+    <string name="schedule_disconnect_at">Disconnect at</string>
+    <string name="schedule_note">Schedule fires daily at the chosen time. Requires the app to have been opened at least once.</string>
+
+    <!-- v2.4.0: Traffic Chart -->
+    <string name="traffic_chart_title">Traffic by Day</string>
+    <string name="traffic_chart_no_data">Connect to start collecting data</string>
 </resources>

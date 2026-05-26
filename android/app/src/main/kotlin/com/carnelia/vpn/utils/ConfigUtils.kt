@@ -302,7 +302,19 @@ object ConfigParser {
                     } catch (_: Exception) {
                         rawValue
                     }
-                    queryMap[key] = decodedValue
+                    // For pbk (REALITY public key): URLDecoder converts unencoded '+' to space,
+                    // which corrupts standard-base64 encoded keys. Normalize to base64url:
+                    // convert spaces back to '+', then '+' → '-', '/' → '_', strip padding.
+                    val finalValue = if (key == "pbk" || key == "publickey" || key == "pk") {
+                        decodedValue
+                            .replace(' ', '+')   // restore any '+' that URLDecoder decoded as space
+                            .replace('+', '-')   // standard base64 → base64url
+                            .replace('/', '_')
+                            .trimEnd('=')
+                    } else {
+                        decodedValue
+                    }
+                    queryMap[key] = finalValue
                 }
             }
 

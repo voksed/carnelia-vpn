@@ -18,6 +18,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -25,6 +26,10 @@
     <uses-permission android:name="android.permission.ACCESS_MOCK_LOCATION" tools:ignore="MockLocation" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- v2.4.0: VPN Schedule (daily alarm) -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:ignore="DiscouragedApi" />
 
     <application
         android:name=".CarheliaApplication"
@@ -35,7 +40,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CarheliaVPN"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
 
         <service
@@ -167,6 +173,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- v2.4.0: VPN Schedule receiver -->
+        <receiver
+            android:name=".service.ScheduleReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.carnelia.vpn.SCHEDULE_CONNECT" />
+                <action android:name="com.carnelia.vpn.SCHEDULE_DISCONNECT" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
@@ -196,6 +213,28 @@
             android:name=".service.GeoSpoofService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <!-- v2.4.0: DNS-only VPN service (encrypts DNS without full VPN) -->
+        <service
+            android:name=".service.DnsOnlyService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+        <!-- v2.4.0: Network Boost service (WiFi + Mobile standalone) -->
+        <service
+            android:name=".service.NetworkBoostService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
+        <!-- v2.4.0: Standalone Tools screen -->
+        <activity
+            android:name=".StandaloneToolsActivity"
+            android:exported="false" />
 
         <receiver
             android:name=".widget.VpnWidgetProvider"
