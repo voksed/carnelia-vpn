@@ -364,18 +364,43 @@ object PrefsManager {
     fun setProbeHosts(context: Context, hosts: String) =
         getPrefs(context).edit().putString("bypass_probe_hosts", hosts).apply()
 
-    // Fragmentation learned by BypassProbe on this network; empty string = not measured yet.
-    fun getProbedFragmentLength(context: Context): String =
-        getPrefs(context).getString("bypass_probe_length", "") ?: ""
+    // Fragmentation learned by BypassProbe, kept per transport because Wi-Fi and mobile
+    // operators filter differently. Empty string = not measured yet.
+    private fun probeNetworkKey(context: Context): String {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        val caps = try { cm?.getNetworkCapabilities(cm.activeNetwork) } catch (_: Exception) { null }
+        return when {
+            caps == null -> "other"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cell"
+            else -> "other"
+        }
+    }
 
-    fun getProbedFragmentInterval(context: Context): String =
-        getPrefs(context).getString("bypass_probe_interval", "") ?: ""
+    private fun probed(context: Context, field: String): String {
+        val prefs = getPrefs(context)
+        return prefs.getString("bypass_probe_${field}_${probeNetworkKey(context)}", null)
+            ?: prefs.getString("bypass_probe_$field", "") ?: ""
+    }
 
-    fun setProbedFragment(context: Context, length: String, interval: String) =
+    fun getProbedFragmentLength(context: Context): String = probed(context, "length")
+
+    fun getProbedFragmentInterval(context: Context): String = probed(context, "interval")
+
+    fun setProbedFragment(context: Context, length: String, interval: String) {
+        val key = probeNetworkKey(context)
         getPrefs(context).edit()
-            .putString("bypass_probe_length", length)
-            .putString("bypass_probe_interval", interval)
+            .putString("bypass_probe_length_$key", length)
+            .putString("bypass_probe_interval_$key", interval)
             .apply()
+    }
+
+    // Set when the probe saw forged DNS answers, so Xray resolves over DoH.
+    fun isProbeDohNeeded(context: Context): Boolean =
+        getPrefs(context).getBoolean("bypass_probe_doh", false)
+
+    fun setProbeDohNeeded(context: Context, needed: Boolean) =
+        getPrefs(context).edit().putBoolean("bypass_probe_doh", needed).apply()
 
     // TLS ClientHello (uTLS) fingerprint — какой браузер имитировать по умолчанию,
     // если сервер сам не задал fp= в ссылке. Обходит DPI по белым спискам TLS-отпечатков.

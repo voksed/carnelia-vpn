@@ -274,7 +274,7 @@ object XrayCoreManager {
         root.put("outbounds", buildOutbounds(context, vpnConfig))
         
         // Routing
-        root.put("routing", buildRouting(context))
+        root.put("routing", buildRouting(context, blockQuic = isFragmenting(context, vpnConfig)))
 
         return root
     }
@@ -283,7 +283,12 @@ object XrayCoreManager {
         val dns = JSONObject()
         val servers = JSONArray()
         
-        if (PrefsManager.isNetShieldEnabled(context)) {
+        if (PrefsManager.isProbeDohNeeded(context)) {
+             // The probe saw this network's resolver return forged answers: ask over HTTPS instead.
+             AppLogger.log("DNS: resolver tampering detected, using DoH")
+             servers.put("https+local://1.1.1.1/dns-query")
+             servers.put("https+local://8.8.8.8/dns-query")
+        } else if (PrefsManager.isNetShieldEnabled(context)) {
              AppLogger.log("NetShield: Enabled. Using AdGuard DNS.")
              servers.put("94.140.14.14") // AdGuard Default
              servers.put("94.140.15.15")
@@ -475,7 +480,12 @@ object XrayCoreManager {
         return outbounds
     }
 
-    private fun buildRouting(context: Context): JSONObject {
+    /** True when TLS fragmentation is in play for this connection (serverless, Black Wall or manual). */
+    private fun isFragmenting(context: Context, vpnConfig: VpnServerConfig): Boolean =
+        vpnConfig.protocol == VpnProtocol.FREEDOM || BlackWallEngine.isEnabled(context) ||
+            PrefsManager.isFragmentationEnabled(context)
+
+    private fun buildRouting(context: Context, blockQuic: Boolean = false): JSONObject {
         val routing = JSONObject()
         
         // Domain Strategy
@@ -490,6 +500,16 @@ object XrayCoreManager {
         val effectiveProxy = TAG_PROXY_OUT
 
         val rules = JSONArray()
+
+        // QUIC carries the SNI inside UDP where TCP fragmentation cannot reach it. Dropping UDP/443
+        // makes browsers and apps fall back to TCP+TLS, which the fragmenter covers.
+        if (blockQuic) {
+            rules.put(JSONObject()
+                .put("type", "field")
+                .put("network", "udp")
+                .put("port", "443")
+                .put("outboundTag", TAG_BLOCKED))
+        }
 
         // Private IP Bypass (hardcoded ranges, no geo files needed)
         val privateRule = JSONObject()

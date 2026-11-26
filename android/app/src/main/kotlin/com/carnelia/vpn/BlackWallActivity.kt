@@ -129,6 +129,9 @@ fun BlackWallScreen(onBack: () -> Unit) {
                     probeResults = probeResults + site
                 }
             }
+            PrefsManager.setProbeDohNeeded(
+                context, report.sites.any { it.verdict == BypassProbe.Verdict.DNS_TAMPERED }
+            )
             val best = report.best
             if (best != null) {
                 PrefsManager.setProbedFragment(context, best.xrayLength, best.xrayInterval)
