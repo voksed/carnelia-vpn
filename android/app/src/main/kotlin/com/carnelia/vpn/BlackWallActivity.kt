@@ -101,7 +101,7 @@ fun BlackWallScreen(onBack: () -> Unit) {
         }
     }
 
-    // Block detection: local OONI-style DNS/TCP/TLS probe that tunes the fragmentation.
+    // Block detection: local DNS/TCP/TLS probe that tunes the fragmentation.
     val scope = rememberCoroutineScope()
     var probing by remember { mutableStateOf(false) }
     var hostsText by remember {
@@ -138,15 +138,6 @@ fun BlackWallScreen(onBack: () -> Unit) {
             }
             probing = false
         }
-    }
-    fun openOoni() {
-        // OONI Probe has no deep link for custom URL lists; hand the sites over via the clipboard.
-        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("sites", probeHosts().joinToString("\n")))
-        Toast.makeText(context, context.getString(R.string.xbw_probe_ooni_copied), Toast.LENGTH_LONG).show()
-        val launch = context.packageManager.getLaunchIntentForPackage("org.openobservatory.ooniprobe")
-            ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=org.openobservatory.ooniprobe"))
-        context.startActivity(launch)
     }
 
     Scaffold(
@@ -371,9 +362,6 @@ fun BlackWallScreen(onBack: () -> Unit) {
                     probeResults.sortedBy { it.host }.forEach { ProbeResultRow(it) }
                     probeSummary?.let {
                         Text(it, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
-                    }
-                    OutlinedButton(onClick = { openOoni() }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.xbw_probe_ooni))
                     }
                 }
             }

@@ -899,10 +899,8 @@ Android: %2$s
     <string name="xbw_probe_running">Идёт проверка…</string>
     <string name="xbw_probe_applied">Применено: %1$s</string>
     <string name="xbw_probe_none">Блокировок нет или фрагментация не помогла</string>
-    <string name="xbw_probe_ooni">Проверить в OONI Probe</string>
     <string name="xbw_probe_vpn_on">Отключите VPN перед тестом</string>
     <string name="xbw_probe_hosts">Сайты для проверки (по одному в строке или через запятую)</string>
-    <string name="xbw_probe_ooni_copied">Список сайтов скопирован. В OONI Probe выберите «Сайты» и вставьте свой список.</string>
     <string name="xbw_verdict_ok">Открыт</string>
     <string name="xbw_verdict_dns">Подмена DNS</string>
     <string name="xbw_verdict_ip">Блок по IP</string>

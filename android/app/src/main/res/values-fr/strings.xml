@@ -897,10 +897,8 @@ Dernière erreur : %5$s
     <string name="xbw_probe_running">Test en cours…</string>
     <string name="xbw_probe_applied">Appliqué : %1$s</string>
     <string name="xbw_probe_none">Aucun blocage ou aucune fragmentation n&#8217;a aidé</string>
-    <string name="xbw_probe_ooni">Vérifier avec OONI Probe</string>
     <string name="xbw_probe_vpn_on">Déconnectez le VPN avant le test</string>
     <string name="xbw_probe_hosts">Sites à tester (un par ligne ou séparés par des virgules)</string>
-    <string name="xbw_probe_ooni_copied">Liste copiée. Dans OONI Probe choisissez Sites web puis collez votre liste.</string>
     <string name="xbw_verdict_ok">Ouvert</string>
     <string name="xbw_verdict_dns">DNS falsifié</string>
     <string name="xbw_verdict_ip">IP bloquée</string>

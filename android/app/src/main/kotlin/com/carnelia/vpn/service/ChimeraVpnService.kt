@@ -441,62 +441,39 @@ class ChimeraVpnService : VpnService() {
                  builder.setBlocking(true)
             }
             
-            // Split Tunneling Logic
+            // Split tunneling. Android allows either an allow-list (only these apps use the VPN,
+            // everything else keeps the normal connection) or a disallow-list (everything uses
+            // the VPN except these apps), never both, so the two are resolved up front.
             val firewallBlocked = PrefsManager.getFirewallBlockedApps(this)
-            val hasFirewall = firewallBlocked.isNotEmpty()
+            val splitOn = PrefsManager.isSplitTunnelingEnabled(this)
+            val mode = PrefsManager.getSplitTunnelMode(this) // "allow" or "disallow"
+            // The app itself never goes into the tunnel: Xray shares its UID and would loop.
+            val selected = if (splitOn) PrefsManager.getSelectedApps(this).filter { it != packageName } else emptyList()
+            val allowList = selected.filter { it !in firewallBlocked }
 
-            if (hasFirewall) {
-                // Firewall mode: add blocked apps to disallowedApplication.
-                // They won't route through VPN tunnel.
-                // NOTE: setUnderlyingNetworks(emptyArray()) is intentionally NOT called —
-                // it causes Android to mark the VPN as "no connectivity" and ALL apps lose internet.
-                AppLogger.log("Service: Firewall mode — disallowing ${firewallBlocked.size} apps")
-                for (pkg in firewallBlocked) {
-                    try { builder.addDisallowedApplication(pkg) } catch (e: Exception) {}
-                }
-                // Exclude self to prevent Xray loop
-                try { builder.addDisallowedApplication(packageName) } catch (e: Exception) {}
-            } else if (PrefsManager.isSplitTunnelingEnabled(this)) {
-                val selectedApps = PrefsManager.getSelectedApps(this)
-                val mode = PrefsManager.getSplitTunnelMode(this) // "allow" or "disallow"
-                // Never include the VPN app itself in allow-list — Xray runs under the same UID
-                // and routing its traffic through the TUN would create a loop.
-                val filteredApps = selectedApps.filter { it != packageName }
-
-                if (mode == "allow" && filteredApps.isEmpty()) {
-                    // No valid apps to allow — fall through to global proxy
-                    AppLogger.log("Service: Split Tunneling allow-list empty after self-filter — Global Proxy")
-                    try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
-                } else if (filteredApps.isNotEmpty()) {
-                    AppLogger.log("Service: Split Tunneling ($mode) for ${filteredApps.size} apps")
-                    for (pkg in filteredApps) {
-                        try {
-                            if (mode == "disallow") {
-                                builder.addDisallowedApplication(pkg)
-                            } else {
-                                builder.addAllowedApplication(pkg)
-                            }
-                        } catch (e: Exception) {
-                            AppLogger.error("Service: Failed to $mode app $pkg", e)
-                        }
+            if (splitOn && mode == "allow" && allowList.isNotEmpty()) {
+                AppLogger.log("Service: Split Tunneling (allow) — VPN only for ${allowList.size} apps, rest direct")
+                for (pkg in allowList) {
+                    try { builder.addAllowedApplication(pkg) } catch (e: Exception) {
+                        AppLogger.error("Service: Failed to allow app $pkg", e)
                     }
-                    // In disallow mode also exclude self so Xray reaches internet directly
-                    if (mode == "disallow") {
-                        try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
-                    }
-                    // In allow mode: self (Xray) is not in allow list → bypasses VPN ✓
-                } else {
-                    AppLogger.log("Service: Split Tunneling active but list empty ($mode) — Global Proxy")
-                    try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
                 }
-
             } else {
-                AppLogger.log("Service: Split Tunneling disabled (Global Proxy)")
-                try {
-                    // Critical: Exclude self to allow Xray process to reach internet directly
-                    builder.addDisallowedApplication(packageName)
-                } catch (e: Exception) {
-                    AppLogger.error("Service: Failed to exclude self from VPN", e)
+                val excluded = linkedSetOf<String>()
+                excluded += firewallBlocked
+                if (splitOn && mode == "disallow") excluded += selected
+                excluded += packageName
+                if (splitOn && selected.isEmpty()) {
+                    AppLogger.log("Service: Split Tunneling enabled but list empty — Global Proxy")
+                } else if (!splitOn) {
+                    AppLogger.log("Service: Split Tunneling disabled (Global Proxy)")
+                } else {
+                    AppLogger.log("Service: Split Tunneling ($mode) — ${excluded.size - 1} apps bypass the VPN")
+                }
+                for (pkg in excluded) {
+                    try { builder.addDisallowedApplication(pkg) } catch (e: Exception) {
+                        AppLogger.error("Service: Failed to exclude app $pkg", e)
+                    }
                 }
             }
 

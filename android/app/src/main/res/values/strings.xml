@@ -897,10 +897,8 @@ Last Error: %5$s
     <string name="xbw_probe_running">Testing…</string>
     <string name="xbw_probe_applied">Applied: %1$s</string>
     <string name="xbw_probe_none">Nothing blocked, or no fragmentation helped</string>
-    <string name="xbw_probe_ooni">Verify with OONI Probe</string>
     <string name="xbw_probe_vpn_on">Disconnect the VPN before testing</string>
     <string name="xbw_probe_hosts">Sites to test (one per line, or comma separated)</string>
-    <string name="xbw_probe_ooni_copied">Site list copied. In OONI Probe choose Websites, then paste your own list.</string>
     <string name="xbw_verdict_ok">Open</string>
     <string name="xbw_verdict_dns">DNS spoofed</string>
     <string name="xbw_verdict_ip">IP blocked</string>

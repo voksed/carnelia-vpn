@@ -897,10 +897,8 @@ Android: %2$s
     <string name="xbw_probe_running">جارٍ الاختبار…</string>
     <string name="xbw_probe_applied">تم التطبيق: %1$s</string>
     <string name="xbw_probe_none">لا حجب أو لم تنجح أي تجزئة</string>
-    <string name="xbw_probe_ooni">التحقق عبر OONI Probe</string>
     <string name="xbw_probe_vpn_on">افصل VPN قبل الاختبار</string>
     <string name="xbw_probe_hosts">المواقع المراد اختبارها (واحد في كل سطر أو مفصولة بفواصل)</string>
-    <string name="xbw_probe_ooni_copied">تم نسخ قائمة المواقع. في OONI Probe اختر المواقع ثم الصق قائمتك.</string>
     <string name="xbw_verdict_ok">مفتوح</string>
     <string name="xbw_verdict_dns">تلاعب DNS</string>
     <string name="xbw_verdict_ip">IP محجوب</string>
